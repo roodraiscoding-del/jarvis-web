@@ -18,6 +18,7 @@ import {
   DailyGoal,
   SocialDraft,
   SystemStatusData,
+  SpeechDiagnostics,
 } from './types';
 import { Calendar, Share2, Shield, Music, FileText, Compass, Info, CheckCircle2, Sparkles, Mic, Radio } from 'lucide-react';
 import { playVoiceButtonSound } from './utils/audioSynth';
@@ -36,6 +37,7 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [speechTranscript, setSpeechTranscript] = useState<string>('');
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [speechDiagnostics, setSpeechDiagnostics] = useState<SpeechDiagnostics | null>(null);
   const [focusTrigger, setFocusTrigger] = useState<number>(0);
   const voiceModeRef = useRef<boolean>(false);
 
@@ -43,6 +45,14 @@ export default function App() {
   useEffect(() => {
     voiceModeRef.current = voiceMode;
   }, [voiceMode]);
+
+  // Subscribe to real-time speech engine diagnostics and permission updates
+  useEffect(() => {
+    const unsub = speechManager.subscribeDiagnostics((diag) => {
+      setSpeechDiagnostics(diag);
+    });
+    return unsub;
+  }, []);
 
   // System & Processing State
   const [statusData, setStatusData] = useState<SystemStatusData | null>(null);
@@ -207,8 +217,13 @@ export default function App() {
                 startListeningLoop();
               }
             },
-            () => {
+            (diagOrErr) => {
               setIsSpeaking(false);
+              if (diagOrErr?.recommendation || diagOrErr?.lastFailureReason) {
+                setSpeechError(
+                  `Voice notice: ${diagOrErr.lastFailureReason || 'Speech synthesis restricted'}. ${diagOrErr.recommendation || ''}`
+                );
+              }
               if (voiceModeRef.current) {
                 startListeningLoop();
               }
@@ -303,6 +318,9 @@ export default function App() {
   }, [handleSendCommand, stopVoiceAssistant]);
 
   const startVoiceAssistant = useCallback(() => {
+    // Explicitly initialize and prime speechManager on button interaction
+    speechManager.initialize('start_voice_assistant_button');
+
     if (!speechManager.isRecognitionSupported()) {
       setSpeechError('Web Speech API is not supported on this browser. Jarvis has fallen back to Chat Mode.');
       setVoiceMode(false);
@@ -312,12 +330,14 @@ export default function App() {
     setSpeechError(null);
     setSpeechTranscript('');
     playVoiceButtonSound('activate');
-    speechManager.primeVoiceEngine();
 
     startListeningLoop();
   }, [startListeningLoop]);
 
   const toggleVoiceMode = useCallback(() => {
+    // Prime speech engine synchronously within user click gesture context
+    speechManager.initialize('toggle_voice_mode_click');
+
     setVoiceMode((prev) => {
       const next = !prev;
       voiceModeRef.current = next;
@@ -331,6 +351,20 @@ export default function App() {
       return next;
     });
   }, [startVoiceAssistant, stopVoiceAssistant]);
+
+  // Manual audio and permission test trigger
+  const handleTestVoice = useCallback(async () => {
+    setSpeechError(null);
+    setIsSpeaking(true);
+    const diag = await speechManager.testVoiceEngine();
+    setSpeechDiagnostics(diag);
+    if (diag.permissions.microphone === 'denied') {
+      setSpeechError('Microphone permission is denied in browser settings. Please allow microphone access.');
+    } else if (!diag.isSynthesisSupported && !diag.isAudioContextReady) {
+      setSpeechError('Neither native speech synthesis nor Web Audio is supported in this browser.');
+    }
+    setTimeout(() => setIsSpeaking(false), 2500);
+  }, []);
 
   // Keyboard shortcut listener: Spacebar toggles voice mode
   // Only triggers when no text input/textarea/select is focused so it doesn't interfere with typing
@@ -346,6 +380,7 @@ export default function App() {
 
         if (!isInput) {
           e.preventDefault();
+          speechManager.initialize('spacebar_key_press');
           toggleVoiceMode();
         }
       }
@@ -701,6 +736,8 @@ export default function App() {
           speechError={speechError}
           onDismissError={() => setSpeechError(null)}
           isSpeechSupported={speechManager.isRecognitionSupported()}
+          onTestVoice={handleTestVoice}
+          diagnostics={speechDiagnostics}
         />
 
         {/* Dual Panel Layout: Command Terminal on Left, Active Workspace Panel on Right */}
@@ -714,12 +751,19 @@ export default function App() {
               voiceMode={voiceMode}
               focusTrigger={focusTrigger}
               onSpeakMessage={(text) => {
+                speechManager.initialize('terminal_message_speak_button');
                 setIsSpeaking(true);
+                setSpeechError(null);
                 speechManager.speak(
                   text,
                   () => setIsSpeaking(true),
                   () => setIsSpeaking(false),
-                  () => setIsSpeaking(false)
+                  (diag) => {
+                    setIsSpeaking(false);
+                    if (diag?.lastFailureReason) {
+                      setSpeechError(`Voice notice: ${diag.lastFailureReason}. ${diag.recommendation || ''}`);
+                    }
+                  }
                 );
               }}
             />

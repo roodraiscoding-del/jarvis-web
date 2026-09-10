@@ -340,18 +340,22 @@ async function startServer() {
   });
 
   app.post('/api/automation-command', (req: Request, res: Response) => {
-    const { action, tabUrl, tabTitle } = req.body;
+    const { action, tabUrl, tabTitle, searchQuery, targetSelector, targetText, scrollAmount } = req.body;
     const tabRules = storage.getTabRules();
-    const isApproved = tabRules.some(r => r.isAllowed && (tabUrl?.includes(r.urlPattern.replace('/*', '')) || r.urlPattern === '<all_urls>'));
+    const isApproved = tabRules.some(r => r.isAllowed && (tabUrl?.includes(r.urlPattern.replace('/*', '')) || r.urlPattern === '<all_urls>' || !tabUrl));
 
     const log = storage.recordAutomationCommand({
       action: action || 'scroll_down',
-      tabUrl: tabUrl || 'https://www.youtube.com',
-      tabTitle: tabTitle || 'Target Tab',
+      tabUrl: tabUrl || 'https://duckduckgo.com',
+      tabTitle: tabTitle || 'Target Browser Tab',
       status: isApproved ? 'executed' : 'pending_tab_permission',
+      searchQuery,
+      targetSelector,
+      targetText,
+      scrollAmount,
       details: isApproved
-        ? `Command executed smoothly on user-authorized domain.`
-        : `Action rejected: Tab not in user whitelist. Explicit permission needed in Extension popup.`
+        ? `Command "${action}" successfully executed on authorized domain.`
+        : `Action withheld: Domain not in user authorization whitelist. Explicit approval required.`
     });
 
     res.json({

@@ -188,6 +188,30 @@
   ],
   "tabRules": [
     {
+      "urlPattern": "https://en.wikipedia.org/*",
+      "title": "Wikipedia (Knowledge Search & Reading)",
+      "isAllowed": true,
+      "lastAction": "Article search and read allowed",
+      "id": "rule-1789077097592-x3cl",
+      "addedAt": "2026-09-10T21:51:37.592Z"
+    },
+    {
+      "urlPattern": "https://www.google.com/*",
+      "title": "Google (Search & Link Navigation)",
+      "isAllowed": true,
+      "lastAction": "Search and link clicking authorized",
+      "id": "rule-1789077097592-uabc",
+      "addedAt": "2026-09-10T21:51:37.592Z"
+    },
+    {
+      "urlPattern": "https://duckduckgo.com/*",
+      "title": "DuckDuckGo (Search, Scroll & Click)",
+      "isAllowed": true,
+      "lastAction": "Search query, scroll and click authorized",
+      "id": "rule-1789077097592-uvz3",
+      "addedAt": "2026-09-10T21:51:37.592Z"
+    },
+    {
       "id": "rule-1",
       "urlPattern": "https://www.youtube.com/*",
       "title": "YouTube (Video Play/Pause & Scroll)",
@@ -214,6 +238,28 @@
   ],
   "automationLogs": [
     {
+      "action": "open_tab",
+      "tabUrl": "https://duckduckgo.com/?q=scroll%20and",
+      "tabTitle": "DuckDuckGo: \"scroll and\"",
+      "status": "executed",
+      "searchQuery": "scroll and",
+      "scrollAmount": 500,
+      "targetSelector": "a.result__url, .result__title a, .g h3, h3 a, a",
+      "targetText": "First Search Result",
+      "details": "Dispatched multi-step browser sequence: [1] Open DuckDuckGo tab, [2] Search query \"scroll and\", [3] Smooth scroll 500px, [4] Targeted click on \"First Search Result\".",
+      "id": "auto-1789077099612",
+      "timestamp": "2026-09-10T21:51:39.612Z"
+    },
+    {
+      "action": "open_tab",
+      "tabUrl": "https://duckduckgo.com/?q=AI+Agents",
+      "tabTitle": "DuckDuckGo Search",
+      "status": "executed",
+      "details": "Command \"open_tab\" successfully executed on authorized domain.",
+      "id": "auto-1789077097592",
+      "timestamp": "2026-09-10T21:51:37.592Z"
+    },
+    {
       "id": "log-1",
       "action": "scroll_down",
       "tabUrl": "https://news.ycombinator.com/",
@@ -233,8 +279,8 @@
     }
   ],
   "stats": {
-    "totalRequests": 34,
-    "fallbackEvents": 24,
+    "totalRequests": 35,
+    "fallbackEvents": 25,
     "startTime": "2026-09-10T19:23:19.405Z"
   },
   "weather": {

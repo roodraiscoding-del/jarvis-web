@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText, Volume2, CloudSun } from 'lucide-react';
+import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText, Volume2, CloudSun, Globe, MousePointer, ArrowDown } from 'lucide-react';
 import { ChatMessage } from '../types';
 
 interface CommandTerminalProps {
@@ -12,11 +12,11 @@ interface CommandTerminalProps {
 }
 
 const QUICK_PROMPTS = [
+  { label: '🌐 Open Tab, Search & Click', text: 'give the agent access to open another tab and search there scroll and click' },
   { label: '📅 Schedule Meeting', text: 'Schedule a strategy meeting with the engineering team tomorrow at 2:00 PM' },
   { label: '⏰ Set Daily Reminder', text: 'Remind me to check Groq & Gemini free-tier rate limits at 6:00 PM' },
   { label: '✍️ Draft Social Post', text: 'Draft a YouTube post announcing our free-tier autonomous Jarvis agent' },
   { label: '🎵 Play Synthwave', text: 'Play synthwave cyber focus music' },
-  { label: '🌐 Web Research', text: 'Search what are the latest breakthroughs in open-source AI agent models' },
   { label: '📜 Scroll Allowed Tab', text: 'Scroll down 500px on the active permitted browser tab' },
 ];
 
@@ -226,6 +226,37 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
                     <div className="text-slate-300 text-[11px]">
                       {msg.actionTaken.description}
                     </div>
+
+                    {/* Interactive Browser Actions if Tab Automation */}
+                    {msg.actionTaken.type === 'browser_automation' && msg.actionTaken.details?.tabUrl && (
+                      <div className="mt-2.5 pt-2 border-t border-cyan-500/20 flex flex-wrap gap-2 items-center">
+                        <a
+                          href={msg.actionTaken.details.tabUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs transition-all shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open Live Tab Now</span>
+                        </a>
+
+                        <button
+                          onClick={() => onSendCommand(`Scroll down 500px on active browser tab`)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 text-[11px] transition-colors"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                          <span>Scroll Down</span>
+                        </button>
+
+                        <button
+                          onClick={() => onSendCommand(`Click the first search result on active browser tab`)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 text-[11px] transition-colors"
+                        >
+                          <MousePointer className="w-3 h-3" />
+                          <span>Click First Result</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

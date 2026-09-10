@@ -134,6 +134,22 @@ const INITIAL_DATA: DatabaseSchema = {
   ],
   tabRules: [
     {
+      id: 'rule-ddg',
+      urlPattern: 'https://duckduckgo.com/*',
+      title: 'DuckDuckGo (Search, Scroll & Click)',
+      isAllowed: true,
+      lastAction: 'Search query and scroll allowed',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: 'rule-google',
+      urlPattern: 'https://www.google.com/*',
+      title: 'Google (Search & Link Navigation)',
+      isAllowed: true,
+      lastAction: 'Search and link clicking authorized',
+      addedAt: new Date().toISOString()
+    },
+    {
       id: 'rule-1',
       urlPattern: 'https://www.youtube.com/*',
       title: 'YouTube (Video Play/Pause & Scroll)',
@@ -147,6 +163,14 @@ const INITIAL_DATA: DatabaseSchema = {
       title: 'Hacker News (Scroll Reading)',
       isAllowed: true,
       lastAction: 'Scroll down 600px',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: 'rule-wiki',
+      urlPattern: 'https://en.wikipedia.org/*',
+      title: 'Wikipedia (Knowledge Search & Reading)',
+      isAllowed: true,
+      lastAction: 'Article search and read allowed',
       addedAt: new Date().toISOString()
     },
     {
@@ -340,6 +364,47 @@ class StorageManager {
 
   // Tab Rules & Automation
   getTabRules(): BrowserTabRule[] {
+    const defaults = [
+      {
+        urlPattern: 'https://duckduckgo.com/*',
+        title: 'DuckDuckGo (Search, Scroll & Click)',
+        isAllowed: true,
+        lastAction: 'Search query, scroll and click authorized'
+      },
+      {
+        urlPattern: 'https://www.google.com/*',
+        title: 'Google (Search & Link Navigation)',
+        isAllowed: true,
+        lastAction: 'Search and link clicking authorized'
+      },
+      {
+        urlPattern: 'https://www.youtube.com/*',
+        title: 'YouTube (Video Play/Pause & Scroll)',
+        isAllowed: true,
+        lastAction: 'Video & search commands allowed'
+      },
+      {
+        urlPattern: 'https://en.wikipedia.org/*',
+        title: 'Wikipedia (Knowledge Search & Reading)',
+        isAllowed: true,
+        lastAction: 'Article search and read allowed'
+      }
+    ];
+
+    let changed = false;
+    for (const def of defaults) {
+      if (!this.data.tabRules.some(r => r.urlPattern === def.urlPattern)) {
+        this.data.tabRules.unshift({
+          ...def,
+          id: `rule-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          addedAt: new Date().toISOString()
+        });
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.saveData(this.data);
+    }
     return this.data.tabRules;
   }
 

@@ -97,12 +97,16 @@ export interface BrowserTabRule {
 
 export interface BrowserAutomationCommand {
   id: string;
-  action: 'scroll_down' | 'scroll_up' | 'play_video' | 'pause_video' | 'copy_text';
+  action: 'scroll_down' | 'scroll_up' | 'play_video' | 'pause_video' | 'copy_text' | 'open_tab' | 'search' | 'click_element';
   tabUrl: string;
   tabTitle: string;
   timestamp: string;
   status: 'executed' | 'pending_tab_permission' | 'declined';
   details?: string;
+  searchQuery?: string;
+  targetSelector?: string;
+  targetText?: string;
+  scrollAmount?: number;
 }
 
 export interface DocumentSummaryResult {
@@ -142,4 +146,29 @@ export interface SystemStatusData {
     pendingDraftsCount: number;
     remindersCount: number;
   };
+}
+
+export interface SpeechDiagnostics {
+  isSynthesisSupported: boolean;
+  isRecognitionSupported: boolean;
+  isAudioContextReady: boolean;
+  audioContextState: string;
+  speechSynthesisState: {
+    speaking: boolean;
+    pending: boolean;
+    paused: boolean;
+    voicesCount: number;
+    defaultVoice?: string;
+  };
+  userActivation: {
+    hasBeenActive: boolean;
+    isActive: boolean;
+  };
+  permissions: {
+    microphone: string;
+  };
+  isInIframe: boolean;
+  lastEventTimestamp: string;
+  lastFailureReason?: string;
+  recommendation?: string;
 }

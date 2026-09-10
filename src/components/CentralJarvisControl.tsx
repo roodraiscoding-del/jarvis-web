@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, MessageSquare, Volume2, Sparkles, AlertCircle, Radio } from 'lucide-react';
+import { Mic, MicOff, MessageSquare, Volume2, Sparkles, AlertCircle, Radio, Activity, ShieldCheck, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { SpeechDiagnostics } from '../types';
 
 interface CentralJarvisControlProps {
   voiceMode: boolean;
@@ -12,6 +13,8 @@ interface CentralJarvisControlProps {
   speechError: string | null;
   onDismissError?: () => void;
   isSpeechSupported: boolean;
+  onTestVoice?: () => void;
+  diagnostics?: SpeechDiagnostics | null;
 }
 
 export const CentralJarvisControl: React.FC<CentralJarvisControlProps> = ({
@@ -24,7 +27,10 @@ export const CentralJarvisControl: React.FC<CentralJarvisControlProps> = ({
   speechError,
   onDismissError,
   isSpeechSupported,
+  onTestVoice,
+  diagnostics,
 }) => {
+  const [showDiagnosticsPanel, setShowDiagnosticsPanel] = useState(false);
   return (
     <div
       id="central-jarvis-control-panel"
@@ -68,8 +74,8 @@ export const CentralJarvisControl: React.FC<CentralJarvisControlProps> = ({
 
       {/* Main Center Content */}
       <div className="relative z-10 flex flex-col items-center justify-center text-center pt-2">
-        {/* Mode Status Pill */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Mode Status Pill & Diagnostics Controls */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
           <div
             className={`px-3 py-1 rounded-full text-xs font-mono font-semibold flex items-center gap-2 border transition-all duration-300 ${
               voiceMode
@@ -89,6 +95,33 @@ export const CentralJarvisControl: React.FC<CentralJarvisControlProps> = ({
               </>
             )}
           </div>
+
+          {onTestVoice && (
+            <button
+              id="test-voice-synthesis-btn"
+              onClick={onTestVoice}
+              type="button"
+              className="px-2.5 py-1 rounded-full text-[11px] font-mono flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-700 text-cyan-300 hover:text-cyan-100 border border-cyan-500/30 transition-all shadow-sm"
+              title="Test speech synthesis and log explicit browser permissions in console"
+            >
+              <Volume2 className="w-3 h-3 text-cyan-400" />
+              <span>Test Voice & Permissions</span>
+            </button>
+          )}
+
+          {diagnostics && (
+            <button
+              id="toggle-speech-diagnostics-btn"
+              onClick={() => setShowDiagnosticsPanel((prev) => !prev)}
+              type="button"
+              className="px-2.5 py-1 rounded-full text-[11px] font-mono flex items-center gap-1 bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 hover:text-white border border-slate-700 transition-all"
+              title="Inspect browser permission status and speech engine telemetry"
+            >
+              <Activity className="w-3 h-3 text-amber-400" />
+              <span>Diagnostics</span>
+              {showDiagnosticsPanel ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          )}
         </div>
 
         {/* Circular Jarvis Logo Button */}
@@ -301,17 +334,119 @@ export const CentralJarvisControl: React.FC<CentralJarvisControlProps> = ({
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
-                className="mt-2 p-2 rounded bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-mono flex items-center justify-between"
+                className="mt-2 p-2.5 rounded bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-mono flex items-center justify-between gap-2 text-left"
               >
-                <span>{speechError}</span>
-                {onDismissError && (
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{speechError}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={onDismissError}
-                    className="text-red-400 hover:text-red-200 text-[10px] underline ml-2"
+                    onClick={() => setShowDiagnosticsPanel(true)}
+                    className="text-cyan-400 hover:text-cyan-200 text-[11px] underline"
                   >
-                    Dismiss
+                    View Diagnostics
                   </button>
-                )}
+                  {onDismissError && (
+                    <button
+                      onClick={onDismissError}
+                      className="text-red-400 hover:text-red-200 text-[11px] underline"
+                    >
+                      Dismiss
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Diagnostic Telemetry Panel */}
+          <AnimatePresence>
+            {showDiagnosticsPanel && diagnostics && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 w-full rounded-xl bg-slate-950/90 border border-slate-700/80 p-3.5 text-left text-xs font-mono space-y-2.5 shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+                    <Activity className="w-4 h-4 text-cyan-400" />
+                    <span>AUDIO & SPEECH SUBSYSTEM TELEMETRY</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500">Updated: {diagnostics.lastEventTimestamp}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                  <div className="p-2 rounded bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                    <span className="text-slate-400 flex items-center gap-1.5">
+                      <Mic className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Microphone</span>
+                    </span>
+                    <span
+                      className={`font-semibold capitalize ${
+                        diagnostics.permissions.microphone === 'granted'
+                          ? 'text-emerald-400'
+                          : diagnostics.permissions.microphone === 'denied'
+                          ? 'text-red-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {diagnostics.permissions.microphone}
+                    </span>
+                  </div>
+
+                  <div className="p-2 rounded bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                    <span className="text-slate-400 flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Synthesis Voices</span>
+                    </span>
+                    <span className="text-slate-200 font-semibold">
+                      {diagnostics.isSynthesisSupported
+                        ? `${diagnostics.speechSynthesisState.voicesCount} loaded (${diagnostics.speechSynthesisState.defaultVoice || 'Default'})`
+                        : 'Not Supported'}
+                    </span>
+                  </div>
+
+                  <div className="p-2 rounded bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                    <span className="text-slate-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Web Audio Context</span>
+                    </span>
+                    <span
+                      className={`font-semibold capitalize ${
+                        diagnostics.isAudioContextReady ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {diagnostics.audioContextState}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded bg-slate-900/50 border border-slate-800/80 text-[11px] text-slate-300">
+                  <div className="text-slate-400 font-semibold mb-0.5">Status & Recommendation:</div>
+                  <div className="text-cyan-200">{diagnostics.recommendation || 'All audio policies nominal.'}</div>
+                  {diagnostics.lastFailureReason && (
+                    <div className="mt-1 text-red-300 text-[10px]">
+                      Last incident: {diagnostics.lastFailureReason}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-slate-500">
+                    Console command: logs explicit table on each speech action
+                  </span>
+                  {onTestVoice && (
+                    <button
+                      onClick={onTestVoice}
+                      className="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Run Voice Test & Re-prime</span>
+                    </button>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
