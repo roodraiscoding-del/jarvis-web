@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Chakra Petch', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Plus Jakarta Sans', sans-serif;
+  }
+  body {
+    font-family: var(--font-sans);
+  }
+}
+
+.font-display {
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Futuristic HUD styling */
+.hud-card {
+  background: rgba(10, 17, 30, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(6, 182, 212, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.hud-card-glow {
+  background: rgba(12, 22, 40, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(6, 182, 212, 0.45);
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.18);
+}
+
+.hud-border-cyan {
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+/* Arc Reactor Pulse Animation */
+@keyframes arcPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 15px rgba(6, 182, 212, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.8), inset 0 0 25px rgba(6, 182, 212, 0.7);
+  }
+}
+
+.arc-reactor-glow {
+  animation: arcPulse 3s infinite ease-in-out;
+}
+
+/* Custom scrollbars for cyber look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0891b2;
+}
