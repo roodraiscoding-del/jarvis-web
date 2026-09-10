@@ -12,6 +12,7 @@ import {
 } from './server/ai-router.js';
 import { executeWebSearch, fetchLiveNews } from './server/web-search.js';
 import { getExtensionFiles } from './server/extension-bundle.js';
+import { fetchWeatherByCoordinates, fetchWeatherByCityName } from './server/weather-service.js';
 
 dotenv.config();
 
@@ -36,18 +37,12 @@ async function startServer() {
   const sendStatusResponse = (req: Request, res: Response) => {
     const stats = storage.getStats();
     const providers = getProviderMatrix();
+    const weather = storage.getWeather();
 
     res.json({
       time: new Date().toLocaleTimeString(),
       uptimeSeconds: Math.floor(process.uptime()),
-      weather: {
-        city: 'San Francisco, CA',
-        tempC: 19,
-        tempF: 66,
-        condition: 'Clear Atmosphere',
-        humidity: 58,
-        windSpeed: '9 mph NW'
-      },
+      weather,
       providers,
       stats: {
         totalMessages: stats.totalRequests,
@@ -63,6 +58,44 @@ async function startServer() {
 
   app.get('/api/status', sendStatusResponse);
   app.get('/api/system-status', sendStatusResponse);
+
+  // Get current weather & location
+  app.get('/api/weather', (req: Request, res: Response) => {
+    res.json({ success: true, weather: storage.getWeather() });
+  });
+
+  // Update weather & location via coordinates or city name
+  app.post('/api/weather/update', async (req: Request, res: Response) => {
+    try {
+      const { latitude, longitude, city } = req.body || {};
+
+      let weatherData;
+      if (latitude !== undefined && longitude !== undefined) {
+        const lat = Number(latitude);
+        const lon = Number(longitude);
+        if (isNaN(lat) || isNaN(lon)) {
+          res.status(400).json({ error: 'Invalid latitude or longitude format' });
+          return;
+        }
+        weatherData = await fetchWeatherByCoordinates(lat, lon);
+      } else if (city && typeof city === 'string') {
+        weatherData = await fetchWeatherByCityName(city.trim());
+      } else {
+        res.status(400).json({ error: 'Provide either { latitude, longitude } or { city }' });
+        return;
+      }
+
+      storage.setWeather(weatherData);
+      res.json({
+        success: true,
+        weather: weatherData,
+        message: `Location synchronized to ${weatherData.city}`
+      });
+    } catch (err: any) {
+      console.error('Weather update failed:', err);
+      res.status(500).json({ error: err.message || 'Failed to update weather' });
+    }
+  });
 
   // Toggle simulated rate-limit to test fallback in real-time
   app.post('/api/simulate-fallback', (req: Request, res: Response) => {
@@ -88,7 +121,8 @@ async function startServer() {
         return;
       }
 
-      const result = await processJarvisCommand(message);
+      const { coords, city } = req.body || {};
+      const result = await processJarvisCommand(message, { coords, city });
       const text = result.reply || (result as any).text || '';
       res.json({
         ...result,

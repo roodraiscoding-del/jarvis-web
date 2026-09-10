@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { storage } from './storage.js';
 import { executeWebSearch } from './web-search.js';
+import { fetchWeatherByCoordinates, fetchWeatherByCityName, WeatherInfo } from './weather-service.js';
 import { ChatMessage, ModelProviderInfo } from '../src/types.js';
 
 let forceSimulatedRateLimit = false;
@@ -323,7 +324,10 @@ export async function executeAiQueryWithFallback(
  * detects the exact requested action (meetings, reminders, social drafts, browser automation),
  * executes the state update in `storage`, and calls the LLM with the context.
  */
-export async function processJarvisCommand(userCommand: string): Promise<ProcessCommandResult> {
+export async function processJarvisCommand(
+  userCommand: string,
+  options?: { coords?: { latitude: number; longitude: number }; city?: string }
+): Promise<ProcessCommandResult> {
   const lower = userCommand.toLowerCase().trim();
   storage.recordRequest();
 
@@ -331,8 +335,62 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
   let sources: ProcessCommandResult['sources'] = undefined;
   let contextForAi = '';
 
-  // 0. Google Workspace Actions (Calendar, Gmail, Docs, Tasks, Contacts, Keep)
+  // 0A. WEATHER & LOCATION SYNCHRONIZATION
   if (
+    lower.includes('weather') ||
+    lower.includes('location') ||
+    lower.includes('temperature') ||
+    lower.includes('forecast') ||
+    lower.includes('climate')
+  ) {
+    try {
+      let weatherData: WeatherInfo | undefined;
+
+      // 1. If explicit GPS coords are supplied
+      if (options?.coords && typeof options.coords.latitude === 'number' && typeof options.coords.longitude === 'number') {
+        weatherData = await fetchWeatherByCoordinates(options.coords.latitude, options.coords.longitude);
+      } else {
+        // 2. Check if a specific city was specified in text (e.g., "in Tokyo", "to London", "for Seattle")
+        const cityMatch = userCommand.match(/(?:in|for|to|at|city of)\s+([a-zA-Z\s]{2,30})/i);
+        let targetCity = options?.city || (cityMatch ? cityMatch[1].trim() : '');
+        targetCity = targetCity.replace(/today|tomorrow|now|my|current|location|weather|the|please/gi, '').trim();
+
+        if (targetCity && targetCity.length >= 2) {
+          weatherData = await fetchWeatherByCityName(targetCity);
+        } else {
+          // 3. User requested current location sync or general weather check
+          const currentW = storage.getWeather();
+          if (currentW.latitude && currentW.longitude) {
+            weatherData = await fetchWeatherByCoordinates(currentW.latitude, currentW.longitude, currentW.city);
+          } else {
+            weatherData = currentW as WeatherInfo;
+          }
+        }
+      }
+
+      if (weatherData) {
+        storage.setWeather(weatherData);
+        actionTaken = {
+          type: 'update_weather',
+          description: `Location & weather synchronized: ${weatherData.city} (${weatherData.tempC}°C / ${weatherData.tempF}°F, ${weatherData.condition})`,
+          details: weatherData
+        };
+        contextForAi = `SYSTEM ACTION COMPLETED: Synchronized location and weather to "${weatherData.city}". Atmospheric vitals: Temperature is ${weatherData.tempC}°C (${weatherData.tempF}°F), condition is "${weatherData.condition}", relative humidity is ${weatherData.humidity}%, wind speed is ${weatherData.windSpeed}. Real-time telemetry is reflected on the user's HUD. Inform the user respectfully and confirm their location update.`;
+      }
+    } catch (err: any) {
+      console.warn('Weather processing note:', err);
+      const currentW = storage.getWeather();
+      actionTaken = {
+        type: 'update_weather',
+        description: `Current location telemetry: ${currentW.city} (${currentW.tempC}°C, ${currentW.condition})`,
+        details: currentW
+      };
+      contextForAi = `USER LOCATION & WEATHER: Current location is ${currentW.city}. Temperature is ${currentW.tempC}°C, condition is ${currentW.condition}. Inform the user that location telemetry is active on their HUD.`;
+    }
+  }
+
+  // 0B. Google Workspace Actions (Calendar, Gmail, Docs, Tasks, Contacts, Keep)
+  else if (
     lower.includes('google workspace') ||
     lower.includes('google calendar') ||
     lower.includes('gmail') ||
@@ -730,9 +788,17 @@ function synthesizeFallbackResponse(prompt: string, actionTaken?: ProcessCommand
     if (actionTaken.type === 'web_research') {
       return `Web research completed for your query. ${actionTaken.description}.`;
     }
+    if (actionTaken.type === 'update_weather') {
+      const w = actionTaken.details || storage.getWeather();
+      return `Authorization confirmed, Sir. Location and weather telemetry synchronized to ${w.city}. Current readings: ${w.tempC}°C (${w.tempF}°F), ${w.condition}. Relative humidity is ${w.humidity}%, with winds at ${w.windSpeed}. Real-time telemetry is reflected on your HUD.`;
+    }
   }
 
   // Conversational fallbacks
+  if (lower.includes('weather') || lower.includes('location') || lower.includes('temperature') || lower.includes('climate')) {
+    const w = storage.getWeather();
+    return `At your command, Sir. Environmental vitals for ${w.city}: ${w.tempC}°C (${w.tempF}°F), ${w.condition}. Relative humidity is at ${w.humidity}%, with wind speed at ${w.windSpeed}. Real-time telemetry is live on your HUD.`;
+  }
   if (lower.includes('full authorization') || lower.includes('operational protocol') || lower.includes('status report')) {
     return 'Authorization acknowledged and protocol confirmed, Sir. All five operational directives are locked into my core:\n\n• Media Control: Ready for play/pause/track signals via browser automation.\n• Social Media: Draft-first constraint active; zero autonomous publishing.\n• Research & Data: Live multi-source web index armed and ready.\n• Task Management: Calendar, reminders, and objectives synced to local persistent storage.\n• Operational Protocol: Proactive, transparent, and waiting for your explicit approval before executing sensitive actions.\n\nI am standing by for your command.';
   }

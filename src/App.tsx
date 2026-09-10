@@ -69,6 +69,7 @@ export default function App() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [goals, setGoals] = useState<DailyGoal[]>([]);
   const [socialDrafts, setSocialDrafts] = useState<SocialDraft[]>([]);
+  const userCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   // Fetch all live state from server
   const loadSystemState = useCallback(async () => {
@@ -95,6 +96,33 @@ export default function App() {
 
   useEffect(() => {
     loadSystemState();
+
+    // Auto-detect browser geolocation if available
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          userCoordsRef.current = coords;
+          // Synchronize with server weather endpoint
+          fetch('/api/weather/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(coords)
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.weather) {
+                setStatusData((prev) => prev ? { ...prev, weather: data.weather } : prev);
+              }
+            })
+            .catch(() => {});
+        },
+        () => {
+          // Geolocation prompt dismissed or denied; defaults remain active
+        },
+        { timeout: 8000, enableHighAccuracy: false }
+      );
+    }
   }, [loadSystemState]);
 
   // Voice Assistant Lifecycle Controls
@@ -122,11 +150,29 @@ export default function App() {
       setMessages((prev) => [...prev, userMsg]);
       setIsProcessing(true);
 
+      // If user is inquiring or issuing weather/location command, attach coordinates
+      const lowerCmd = commandText.toLowerCase();
+      let coordsToSend = userCoordsRef.current;
+      if (!coordsToSend && typeof navigator !== 'undefined' && navigator.geolocation && (lowerCmd.includes('location') || lowerCmd.includes('weather') || lowerCmd.includes('here'))) {
+        try {
+          const pos = await new Promise<GeolocationPosition | null>((resolve) => {
+            navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { timeout: 3000, enableHighAccuracy: true });
+          });
+          if (pos) {
+            coordsToSend = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            userCoordsRef.current = coordsToSend;
+          }
+        } catch {}
+      }
+
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: commandText }),
+          body: JSON.stringify({
+            message: commandText,
+            coords: coordsToSend || undefined
+          }),
         });
 
         if (!res.ok) {

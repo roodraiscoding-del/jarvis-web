@@ -129,6 +129,10 @@ export interface SystemStatusData {
     condition: string;
     humidity: number;
     windSpeed: string;
+    isLiveLocation?: boolean;
+    latitude?: number;
+    longitude?: number;
+    updatedAt?: string;
   };
   providers: ModelProviderInfo[];
   stats: {

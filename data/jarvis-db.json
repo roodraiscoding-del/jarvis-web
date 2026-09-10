@@ -233,8 +233,20 @@
     }
   ],
   "stats": {
-    "totalRequests": 32,
-    "fallbackEvents": 22,
+    "totalRequests": 34,
+    "fallbackEvents": 24,
     "startTime": "2026-09-10T19:23:19.405Z"
+  },
+  "weather": {
+    "city": "New York, New York",
+    "tempC": 31,
+    "tempF": 88,
+    "condition": "Clear Sky",
+    "humidity": 43,
+    "windSpeed": "10 mph",
+    "isLiveLocation": true,
+    "latitude": 40.7128,
+    "longitude": -74.006,
+    "updatedAt": "2026-09-10T21:20:21.415Z"
   }
 }

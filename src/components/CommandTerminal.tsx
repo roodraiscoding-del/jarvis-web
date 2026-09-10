@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText, Volume2 } from 'lucide-react';
+import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText, Volume2, CloudSun } from 'lucide-react';
 import { ChatMessage } from '../types';
 
 interface CommandTerminalProps {
@@ -114,6 +114,8 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
         return <Play className="w-4 h-4 text-purple-400" />;
       case 'summarize_doc':
         return <FileText className="w-4 h-4 text-pink-400" />;
+      case 'update_weather':
+        return <CloudSun className="w-4 h-4 text-amber-400" />;
       default:
         return <CheckCircle2 className="w-4 h-4 text-cyan-400" />;
     }

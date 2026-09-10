@@ -9,6 +9,18 @@ interface DatabaseSchema {
   socialDrafts: SocialDraft[];
   tabRules: BrowserTabRule[];
   automationLogs: BrowserAutomationCommand[];
+  weather?: {
+    city: string;
+    tempC: number;
+    tempF: number;
+    condition: string;
+    humidity: number;
+    windSpeed: string;
+    isLiveLocation?: boolean;
+    latitude?: number;
+    longitude?: number;
+    updatedAt: string;
+  };
   stats: {
     totalRequests: number;
     fallbackEvents: number;
@@ -368,6 +380,30 @@ class StorageManager {
     }
     this.saveData(this.data);
     return newLog;
+  }
+
+  // Weather & Geolocation
+  getWeather() {
+    if (!this.data.weather) {
+      this.data.weather = {
+        city: 'San Francisco, CA',
+        tempC: 19,
+        tempF: 66,
+        condition: 'Clear Atmosphere',
+        humidity: 58,
+        windSpeed: '9 mph',
+        isLiveLocation: false,
+        updatedAt: new Date().toISOString()
+      };
+      this.saveData(this.data);
+    }
+    return this.data.weather;
+  }
+
+  setWeather(weather: NonNullable<DatabaseSchema['weather']>) {
+    this.data.weather = weather;
+    this.saveData(this.data);
+    return this.data.weather;
   }
 
   // Stats
