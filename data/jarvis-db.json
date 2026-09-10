@@ -233,8 +233,8 @@
     }
   ],
   "stats": {
-    "totalRequests": 30,
-    "fallbackEvents": 20,
+    "totalRequests": 32,
+    "fallbackEvents": 22,
     "startTime": "2026-09-10T19:23:19.405Z"
   }
 }
