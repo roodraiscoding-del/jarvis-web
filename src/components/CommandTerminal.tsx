@@ -8,6 +8,8 @@ interface CommandTerminalProps {
   isProcessing: boolean;
   soundEnabled: boolean;
   onSendCommand: (cmd: string) => void;
+  voiceMode?: boolean;
+  focusTrigger?: number;
 }
 
 const QUICK_PROMPTS = [
@@ -24,16 +26,26 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
   isProcessing,
   soundEnabled,
   onSendCommand,
+  voiceMode = false,
+  focusTrigger = 0,
 }) => {
   const [inputVal, setInputVal] = useState('');
   const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isProcessing]);
+
+  // When switching to Chat mode (focusTrigger updates), auto-focus the text input box
+  useEffect(() => {
+    if (focusTrigger > 0 && !voiceMode && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [focusTrigger, voiceMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,13 +261,22 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
         </button>
 
         <input
+          ref={inputRef}
           id="jarvis-command-input"
           type="text"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
-          placeholder="Command Jarvis (e.g., 'Schedule meeting tomorrow at 3pm', 'Draft post', 'Play music')..."
+          placeholder={
+            voiceMode
+              ? "Voice Mode Active: Speak or tap spacebar to switch to typing..."
+              : "Command Jarvis (e.g., 'Schedule meeting tomorrow at 3pm', 'Draft post', 'Play music')..."
+          }
           disabled={isProcessing}
-          className="flex-1 bg-slate-900/90 border border-slate-800 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 font-mono"
+          className={`flex-1 bg-slate-900/90 border rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 font-mono transition-colors focus:outline-none focus:ring-1 ${
+            voiceMode
+              ? 'border-red-500/40 focus:border-red-500 focus:ring-red-500/50'
+              : 'border-slate-800 focus:border-cyan-500/60 focus:ring-cyan-500/50'
+          }`}
         />
 
         <button

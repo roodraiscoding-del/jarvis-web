@@ -10,6 +10,7 @@ interface HeaderHUDProps {
   onOpenMentorGuide: () => void;
   onRefreshStatus: () => void;
   onToggleSimulatedRateLimit: () => void;
+  voiceMode?: boolean;
 }
 
 export const HeaderHUD: React.FC<HeaderHUDProps> = ({
@@ -19,6 +20,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   onOpenMentorGuide,
   onRefreshStatus,
   onToggleSimulatedRateLimit,
+  voiceMode = false,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -35,21 +37,54 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   const activeProvider = statusData?.providers.find((p) => p.isCurrentPrimary) || statusData?.providers[0];
 
   return (
-    <header className="border-b border-cyan-500/20 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-4 py-2.5">
+    <header
+      className={`border-b backdrop-blur-md sticky top-0 z-40 px-4 py-2.5 transition-colors duration-500 ${
+        voiceMode
+          ? 'border-red-500/40 bg-slate-950/90 shadow-[0_4px_25px_rgba(239,68,68,0.15)]'
+          : 'border-cyan-500/20 bg-slate-950/80 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+      }`}
+    >
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         {/* Logo & Identity */}
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-400/40">
-            <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_12px_#06b6d4]" />
-            <div className="absolute inset-0 rounded-lg border border-cyan-400/20 animate-spin" style={{ animationDuration: '8s' }} />
+          <div
+            className={`relative flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+              voiceMode
+                ? 'bg-red-950/80 border border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                : 'bg-cyan-950/60 border border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+            }`}
+          >
+            <div
+              className={`w-3 h-3 rounded-full animate-pulse ${
+                voiceMode
+                  ? 'bg-red-400 shadow-[0_0_12px_#ef4444]'
+                  : 'bg-cyan-400 shadow-[0_0_12px_#06b6d4]'
+              }`}
+            />
+            <div
+              className={`absolute inset-0 rounded-lg border animate-spin ${
+                voiceMode ? 'border-red-400/30' : 'border-cyan-400/20'
+              }`}
+              style={{ animationDuration: '8s' }}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-display font-bold text-lg tracking-wider text-cyan-300">
+              <span
+                className={`font-display font-bold text-lg tracking-wider transition-colors ${
+                  voiceMode ? 'text-red-300' : 'text-cyan-300'
+                }`}
+              >
                 JARVIS
               </span>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-cyan-400">
-                WEB HUD
+              <span
+                className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border transition-colors ${
+                  voiceMode
+                    ? 'bg-red-950/90 border-red-500/50 text-red-300'
+                    : 'bg-cyan-950/80 border-cyan-500/30 text-cyan-400'
+                }`}
+              >
+                {voiceMode ? 'VOICE LIVE' : 'WEB HUD'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 hidden sm:block">

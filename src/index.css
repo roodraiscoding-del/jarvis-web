@@ -67,3 +67,38 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #0891b2;
 }
+
+/* Voice Assistant Mode: Crimson Red Theme Overrides */
+.theme-voice-active {
+  background-color: #060204;
+}
+
+.theme-voice-active .hud-card {
+  background: rgba(28, 7, 11, 0.82) !important;
+  border-color: rgba(239, 68, 68, 0.38) !important;
+  box-shadow: 0 4px 25px rgba(220, 38, 38, 0.18) !important;
+}
+
+.theme-voice-active .hud-card-glow {
+  background: rgba(38, 10, 16, 0.9) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.28) !important;
+}
+
+.theme-voice-active ::-webkit-scrollbar-thumb:hover {
+  background: #ef4444;
+}
+
+@keyframes voiceRedPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 15px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(239, 68, 68, 0.9), inset 0 0 25px rgba(239, 68, 68, 0.7);
+  }
+}
+
+.voice-core-glow {
+  animation: voiceRedPulse 2s infinite ease-in-out;
+}
+

@@ -1,6 +1,6 @@
 {
   "name": "Jarvis AI Assistant",
   "description": "Futuristic AI web agent with multi-model free-tier fallback, Google Workspace integration (Calendar, Gmail, Keep, Docs, Tasks, Contacts), meeting scheduling, reminders, document summarizer, media player, and social drafting approval.",
-  "requestFramePermissions": ["geolocation"],
+  "requestFramePermissions": ["geolocation", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

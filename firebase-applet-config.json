@@ -3,6 +3,7 @@
   "appId": "1:762789769097:web:71dd8a8a84aaacbd56bb58",
   "apiKey": "AIzaSyDFBX5jBEeNcCviuYrQo81QPNxRyGsE1Xc",
   "authDomain": "third-ruler-kvk22.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-jarviswebagent-80e99b1e-5a47-4885-8d92-1a58d1a9b3bc",
   "storageBucket": "third-ruler-kvk22.firebasestorage.app",
   "messagingSenderId": "762789769097",
   "measurementId": "",

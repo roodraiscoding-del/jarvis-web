@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HeaderHUD } from './components/HeaderHUD';
 import { ArcReactorVisualizer } from './components/ArcReactorVisualizer';
+import { CentralJarvisControl } from './components/CentralJarvisControl';
 import { CommandTerminal } from './components/CommandTerminal';
 import { SchedulePanel } from './components/SchedulePanel';
 import { SocialApprovalQueue } from './components/SocialApprovalQueue';
@@ -18,8 +19,9 @@ import {
   SocialDraft,
   SystemStatusData,
 } from './types';
-import { Calendar, Share2, Shield, Music, FileText, Compass, Info, CheckCircle2, Sparkles } from 'lucide-react';
+import { Calendar, Share2, Shield, Music, FileText, Compass, Info, CheckCircle2, Sparkles, Mic, Radio } from 'lucide-react';
 import { playJarvisSound } from './utils/audioSynth';
+import { speechManager } from './utils/speechService';
 
 export default function App() {
   // Navigation & Modal State
@@ -30,6 +32,20 @@ export default function App() {
 
   // Audio FX state
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Central Jarvis Mode & Voice Assistant State (Single Source of Truth)
+  const [voiceMode, setVoiceMode] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [speechTranscript, setSpeechTranscript] = useState<string>('');
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState<number>(0);
+  const voiceModeRef = useRef<boolean>(false);
+
+  // Synchronize ref with state to prevent stale closures in speech and keyboard listeners
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
 
   // System & Processing State
   const [statusData, setStatusData] = useState<SystemStatusData | null>(null);
@@ -84,82 +100,213 @@ export default function App() {
     loadSystemState();
   }, [loadSystemState]);
 
-  // Command Execution Pipeline
-  const handleSendCommand = async (commandText: string) => {
-    if (!commandText.trim() || isProcessing) return;
+  // Voice Assistant Lifecycle Controls
+  const stopVoiceAssistant = useCallback(() => {
+    speechManager.stopAll();
+    setIsListening(false);
+    setIsSpeaking(false);
+    setSpeechTranscript('');
+  }, []);
 
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'user',
-      text: commandText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // Command Execution Pipeline
+  const handleSendCommand = useCallback(
+    async (commandText: string, options?: { speakResponse?: boolean }) => {
+      if (!commandText.trim() || isProcessing) return;
+
+      const shouldSpeak = options?.speakResponse ?? voiceModeRef.current;
+
+      const userMsg: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: 'user',
+        text: commandText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setIsProcessing(true);
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: commandText }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+
+        const replyData: ChatMessage = await res.json();
+        setMessages((prev) => [...prev, replyData]);
+
+        if (replyData.fallbackTriggered) {
+          setLastFallbackTriggered(true);
+          if (soundEnabled) playJarvisSound('fallback');
+        } else {
+          if (soundEnabled) playJarvisSound('action_done');
+        }
+
+        // If in Voice Assistant Mode (or requested), speak response out loud using Web Speech Synthesis
+        if (shouldSpeak && replyData.text) {
+          setIsSpeaking(true);
+          speechManager.speak(
+            replyData.text,
+            () => setIsSpeaking(true),
+            () => {
+              setIsSpeaking(false);
+              // If user is still in voice mode, resume listening for next query
+              if (voiceModeRef.current) {
+                startListeningLoop();
+              }
+            },
+            () => {
+              setIsSpeaking(false);
+              if (voiceModeRef.current) {
+                startListeningLoop();
+              }
+            }
+          );
+        }
+
+        // Automatically switch tab or sync if action requires user attention
+        if (replyData.actionTaken) {
+          const actionType = replyData.actionTaken.type;
+
+          if (actionType === 'google_workspace') {
+            setActiveTab('workspace');
+          } else if (actionType === 'draft_social_post') {
+            setActiveTab('social_approval');
+            await loadSystemState();
+          } else if (actionType === 'schedule_meeting' || actionType === 'set_reminder') {
+            setActiveTab('schedule');
+            await loadSystemState();
+          } else if (actionType === 'media_control') {
+            setActiveTab('media');
+            const intent = replyData.actionTaken.details?.intent || 'play';
+            setExternalMediaCommand({ action: intent, timestamp: Date.now() });
+          } else if (actionType === 'browse_tab') {
+            setActiveTab('browser_companion');
+          } else if (actionType === 'web_research') {
+            setActiveTab('research');
+          }
+        }
+
+        // Refresh system vitals
+        await loadSystemState();
+      } catch (err) {
+        console.error(err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            role: 'assistant',
+            text: 'I encountered an unexpected network interruption. Please verify connectivity or retry your command.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            providerUsed: 'Local Failover Core',
+          },
+        ]);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    // Note: startListeningLoop is referenced inside callback closure
+    [isProcessing, loadSystemState, soundEnabled]
+  );
+
+  const startListeningLoop = useCallback(() => {
+    if (!speechManager.isRecognitionSupported()) {
+      setSpeechError('Web Speech API is not supported in this browser. Chat Mode remains active.');
+      setVoiceMode(false);
+      return;
+    }
+
+    const started = speechManager.startListening(
+      (transcript, isFinal) => {
+        setSpeechTranscript(transcript);
+        if (isFinal && transcript.trim()) {
+          handleSendCommand(transcript, { speakResponse: true });
+        }
+      },
+      (err) => {
+        console.warn('Speech recognition notice:', err);
+        setSpeechError(err);
+        if (err.toLowerCase().includes('denied') || err.toLowerCase().includes('not supported')) {
+          setVoiceMode(false);
+          stopVoiceAssistant();
+        }
+      },
+      (status) => {
+        setIsListening(status === 'listening');
+      }
+    );
+
+    if (!started) {
+      setVoiceMode(false);
+    }
+  }, [handleSendCommand, stopVoiceAssistant]);
+
+  const startVoiceAssistant = useCallback(() => {
+    if (!speechManager.isRecognitionSupported()) {
+      setSpeechError('Web Speech API is not supported on this browser. Jarvis has fallen back to Chat Mode.');
+      setVoiceMode(false);
+      return;
+    }
+
+    setSpeechError(null);
+    setSpeechTranscript('');
+    if (soundEnabled) {
+      playJarvisSound('command_ack');
+    }
+
+    startListeningLoop();
+  }, [soundEnabled, startListeningLoop]);
+
+  const toggleVoiceMode = useCallback(() => {
+    setVoiceMode((prev) => {
+      const next = !prev;
+      voiceModeRef.current = next;
+      if (next) {
+        startVoiceAssistant();
+      } else {
+        stopVoiceAssistant();
+        setFocusTrigger((c) => c + 1);
+        if (soundEnabled) {
+          playJarvisSound('action_done');
+        }
+      }
+      return next;
+    });
+  }, [startVoiceAssistant, stopVoiceAssistant, soundEnabled]);
+
+  // Keyboard shortcut listener: Spacebar toggles voice mode
+  // Only triggers when no text input/textarea/select is focused so it doesn't interfere with typing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        const target = e.target as HTMLElement;
+        const isInput =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.tagName === 'SELECT';
+
+        if (!isInput) {
+          e.preventDefault();
+          toggleVoiceMode();
+        }
+      }
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setIsProcessing(true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleVoiceMode]);
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: commandText })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      const replyData: ChatMessage = await res.json();
-      setMessages((prev) => [...prev, replyData]);
-
-      if (replyData.fallbackTriggered) {
-        setLastFallbackTriggered(true);
-        if (soundEnabled) playJarvisSound('fallback');
-      } else {
-        if (soundEnabled) playJarvisSound('action_done');
-      }
-
-      // Automatically switch tab or sync if action requires user attention
-      if (replyData.actionTaken) {
-        const actionType = replyData.actionTaken.type;
-
-        if (actionType === 'google_workspace') {
-          setActiveTab('workspace');
-        } else if (actionType === 'draft_social_post') {
-          setActiveTab('social_approval');
-          await loadSystemState();
-        } else if (actionType === 'schedule_meeting' || actionType === 'set_reminder') {
-          setActiveTab('schedule');
-          await loadSystemState();
-        } else if (actionType === 'media_control') {
-          setActiveTab('media');
-          const intent = replyData.actionTaken.details?.intent || 'play';
-          setExternalMediaCommand({ action: intent, timestamp: Date.now() });
-        } else if (actionType === 'browse_tab') {
-          setActiveTab('browser_companion');
-        } else if (actionType === 'web_research') {
-          setActiveTab('research');
-        }
-      }
-
-      // Refresh system vitals
-      await loadSystemState();
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          role: 'assistant',
-          text: 'I encountered an unexpected network interruption. Please verify connectivity or retry your command.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          providerUsed: 'Local Failover Core'
-        }
-      ]);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // Clean up any ongoing speech synthesis or speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      speechManager.stopAll();
+    };
+  }, []);
 
   // Toggle simulated rate limit to show the user how multi-model failover works in real time
   const handleToggleSimulatedRateLimit = async () => {
@@ -310,7 +457,23 @@ export default function App() {
   const activeModelName = statusData?.providers.find((p) => p.isCurrentPrimary)?.name || 'Gemini 3.8 Flash';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div
+      className={`min-h-screen flex flex-col font-sans transition-colors duration-500 ${
+        voiceMode
+          ? 'theme-voice-active bg-[#060204] text-slate-100 selection:bg-red-500/30 selection:text-red-200'
+          : 'bg-slate-950 text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200'
+      }`}
+    >
+      {/* Dynamic Voice Mode Status Banner */}
+      {voiceMode && (
+        <div className="bg-red-950/95 border-b border-red-500/60 py-1.5 px-4 text-center text-xs font-mono text-red-200 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.35)]">
+          <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-ping" />
+          <span className="font-bold tracking-wider">VOICE ASSISTANT MODE LIVE</span>
+          <span className="text-red-400 hidden sm:inline">• LISTENING FOR COMMANDS • SPEECH-TO-SPEECH ACTIVE</span>
+          <span className="text-slate-400 text-[11px] hidden md:inline">• PRESS SPACEBAR OR TAP LOGO TO REVERT TO CHAT</span>
+        </div>
+      )}
+
       {/* Top Sci-Fi Navigation HUD */}
       <HeaderHUD
         statusData={statusData}
@@ -319,6 +482,7 @@ export default function App() {
         onOpenMentorGuide={() => setIsMentorGuideOpen(true)}
         onRefreshStatus={loadSystemState}
         onToggleSimulatedRateLimit={handleToggleSimulatedRateLimit}
+        voiceMode={voiceMode}
       />
 
       {/* Main Workspace */}
@@ -332,6 +496,8 @@ export default function App() {
               soundEnabled={soundEnabled}
               activeModelName={activeModelName}
               fallbackTriggered={lastFallbackTriggered}
+              voiceMode={voiceMode}
+              onToggleVoiceMode={toggleVoiceMode}
             />
           </div>
 
@@ -340,14 +506,28 @@ export default function App() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#06b6d4]" />
-                  <h1 className="font-mono font-bold text-sm sm:text-base text-cyan-300">
+                  <span
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      voiceMode
+                        ? 'bg-red-400 shadow-[0_0_8px_#ef4444]'
+                        : 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]'
+                    }`}
+                  />
+                  <h1
+                    className={`font-mono font-bold text-sm sm:text-base transition-colors ${
+                      voiceMode ? 'text-red-300' : 'text-cyan-300'
+                    }`}
+                  >
                     JARVIS AUTONOMOUS AGENT CONSOLE
                   </h1>
                 </div>
                 <button
                   onClick={() => setIsMentorGuideOpen(true)}
-                  className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 underline underline-offset-4"
+                  className={`text-xs font-mono flex items-center gap-1 underline underline-offset-4 transition-colors ${
+                    voiceMode
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-cyan-400 hover:text-cyan-300'
+                  }`}
                 >
                   <Info className="w-3.5 h-3.5" />
                   <span>Architecture & Zero-Cost Guide</span>
@@ -459,6 +639,19 @@ export default function App() {
           </div>
         </div>
 
+        {/* Central Jarvis Dual-Mode Interaction Matrix (Single Tap/Spacebar Toggle) */}
+        <CentralJarvisControl
+          voiceMode={voiceMode}
+          onToggleVoiceMode={toggleVoiceMode}
+          isListening={isListening}
+          isSpeaking={isSpeaking}
+          isProcessing={isProcessing}
+          speechTranscript={speechTranscript}
+          speechError={speechError}
+          onDismissError={() => setSpeechError(null)}
+          isSpeechSupported={speechManager.isRecognitionSupported()}
+        />
+
         {/* Dual Panel Layout: Command Terminal on Left, Active Workspace Panel on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
           {/* Command Terminal (Chat, Speech, Failover logs) */}
@@ -468,6 +661,8 @@ export default function App() {
               isProcessing={isProcessing}
               soundEnabled={soundEnabled}
               onSendCommand={handleSendCommand}
+              voiceMode={voiceMode}
+              focusTrigger={focusTrigger}
             />
           </div>
 
