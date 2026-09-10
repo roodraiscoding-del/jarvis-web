@@ -1,11 +1,9 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Cpu, Zap, Activity } from 'lucide-react';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface ArcReactorProps {
   isProcessing: boolean;
-  soundEnabled: boolean;
   activeModelName?: string;
   fallbackTriggered?: boolean;
   voiceMode?: boolean;
@@ -14,7 +12,6 @@ interface ArcReactorProps {
 
 export const ArcReactorVisualizer: React.FC<ArcReactorProps> = ({
   isProcessing,
-  soundEnabled,
   activeModelName = 'Gemini 3.8 Flash',
   fallbackTriggered = false,
   voiceMode = false,
@@ -23,8 +20,6 @@ export const ArcReactorVisualizer: React.FC<ArcReactorProps> = ({
   const handleClickCore = () => {
     if (onToggleVoiceMode) {
       onToggleVoiceMode();
-    } else if (soundEnabled) {
-      playJarvisSound('command_ack');
     }
   };
 

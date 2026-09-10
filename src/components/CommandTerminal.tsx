@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText } from 'lucide-react';
+import { Send, Mic, Sparkles, AlertTriangle, CheckCircle2, ArrowRight, ExternalLink, Calendar, Bell, Share2, Compass, Play, FileText, Volume2 } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface CommandTerminalProps {
   messages: ChatMessage[];
   isProcessing: boolean;
-  soundEnabled: boolean;
   onSendCommand: (cmd: string) => void;
+  onSpeakMessage?: (text: string) => void;
   voiceMode?: boolean;
   focusTrigger?: number;
 }
@@ -24,8 +23,8 @@ const QUICK_PROMPTS = [
 export const CommandTerminal: React.FC<CommandTerminalProps> = ({
   messages,
   isProcessing,
-  soundEnabled,
   onSendCommand,
+  onSpeakMessage,
   voiceMode = false,
   focusTrigger = 0,
 }) => {
@@ -52,7 +51,6 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
     if (!inputVal.trim() || isProcessing) return;
     const text = inputVal.trim();
     setInputVal('');
-    if (soundEnabled) playJarvisSound('command_ack');
     onSendCommand(text);
   };
 
@@ -90,13 +88,34 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
 
   const getActionIcon = (type: string) => {
     switch (type) {
-      case 'schedule_meeting': return <Calendar className="w-4 h-4 text-cyan-400" />;
-      case 'set_reminder': return <Bell className="w-4 h-4 text-amber-400" />;
-      case 'draft_social_post': return <Share2 className="w-4 h-4 text-emerald-400" />;
-      case 'web_research': return <Compass className="w-4 h-4 text-blue-400" />;
-      case 'media_control': return <Play className="w-4 h-4 text-purple-400" />;
-      case 'summarize_doc': return <FileText className="w-4 h-4 text-pink-400" />;
-      default: return <CheckCircle2 className="w-4 h-4 text-cyan-400" />;
+      case 'schedule_meeting':
+      case 'view_schedule':
+        return <Calendar className="w-4 h-4 text-cyan-400" />;
+      case 'delete_meeting':
+        return <Calendar className="w-4 h-4 text-rose-400" />;
+      case 'set_reminder':
+      case 'delete_reminder':
+      case 'view_reminders':
+        return <Bell className="w-4 h-4 text-amber-400" />;
+      case 'complete_reminder':
+        return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
+      case 'manage_goal':
+      case 'set_goal':
+        return <Sparkles className="w-4 h-4 text-cyan-300" />;
+      case 'draft_social_post':
+        return <Share2 className="w-4 h-4 text-emerald-400" />;
+      case 'google_workspace':
+        return <Share2 className="w-4 h-4 text-amber-300" />;
+      case 'web_research':
+        return <Compass className="w-4 h-4 text-blue-400" />;
+      case 'browser_automation':
+        return <Compass className="w-4 h-4 text-teal-400" />;
+      case 'media_control':
+        return <Play className="w-4 h-4 text-purple-400" />;
+      case 'summarize_doc':
+        return <FileText className="w-4 h-4 text-pink-400" />;
+      default:
+        return <CheckCircle2 className="w-4 h-4 text-cyan-400" />;
     }
   };
 
@@ -146,6 +165,19 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
                     {msg.providerUsed}
                   </span>
                 )}
+
+                {/* Speak button for assistant messages */}
+                {!isUser && onSpeakMessage && (
+                  <button
+                    type="button"
+                    onClick={() => onSpeakMessage(msg.text)}
+                    title="Speak response aloud in voice"
+                    className="ml-auto flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-200 transition-colors px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30 hover:bg-cyan-900/50"
+                  >
+                    <Volume2 className="w-3 h-3 text-cyan-400" />
+                    <span>Speak</span>
+                  </button>
+                )}
               </div>
 
               {/* Message Bubble */}
@@ -178,8 +210,14 @@ export const CommandTerminal: React.FC<CommandTerminalProps> = ({
 
                 {/* Action Taken Badge & Summary Card */}
                 {!isUser && msg.actionTaken && (
-                  <div className="mt-3 p-2.5 rounded-lg bg-cyan-950/40 border border-cyan-500/30 text-xs">
-                    <div className="flex items-center gap-2 text-cyan-300 font-semibold mb-1">
+                  <div className={`mt-3 p-2.5 rounded-lg text-xs ${
+                    msg.actionTaken.type.includes('delete') 
+                      ? 'bg-rose-950/40 border border-rose-500/30' 
+                      : 'bg-cyan-950/40 border border-cyan-500/30'
+                  }`}>
+                    <div className={`flex items-center gap-2 font-semibold mb-1 ${
+                      msg.actionTaken.type.includes('delete') ? 'text-rose-300' : 'text-cyan-300'
+                    }`}>
                       {getActionIcon(msg.actionTaken.type)}
                       <span>ACTION EXECUTED: {msg.actionTaken.type.toUpperCase().replace('_', ' ')}</span>
                     </div>

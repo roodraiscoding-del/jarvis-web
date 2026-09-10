@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Compass, TrendingUp, Newspaper, ExternalLink, Sparkles, Search, ArrowRight, Share2, Eye, Flame } from 'lucide-react';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface WebResearchHubProps {
-  soundEnabled: boolean;
   onDraftFromTrend: (topic: string, platform: 'youtube' | 'instagram') => void;
 }
 
@@ -34,7 +32,7 @@ const TRENDING_CONTENT_OUTLIERS = [
   }
 ];
 
-export const WebResearchHub: React.FC<WebResearchHubProps> = ({ soundEnabled, onDraftFromTrend }) => {
+export const WebResearchHub: React.FC<WebResearchHubProps> = ({ onDraftFromTrend }) => {
   const [activeTab, setActiveTab] = useState<'trends' | 'news' | 'search'>('trends');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -67,7 +65,6 @@ export const WebResearchHub: React.FC<WebResearchHubProps> = ({ soundEnabled, on
       });
       if (res.ok) {
         setSearchResults(await res.json());
-        if (soundEnabled) playJarvisSound('action_done');
       }
     } catch (err) {
       console.error(err);
@@ -160,7 +157,6 @@ export const WebResearchHub: React.FC<WebResearchHubProps> = ({ soundEnabled, on
                   <button
                     onClick={() => {
                       onDraftFromTrend(trend.topic, trend.platform);
-                      if (soundEnabled) playJarvisSound('action_done');
                     }}
                     className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-300 text-[11px] transition-colors"
                   >

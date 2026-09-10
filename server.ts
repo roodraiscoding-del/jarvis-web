@@ -82,20 +82,56 @@ async function startServer() {
   // -------------------------------------------------------------
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { message } = req.body;
+      const message = req.body.message || req.body.command;
       if (!message || typeof message !== 'string') {
         res.status(400).json({ error: 'Command prompt is required' });
         return;
       }
 
       const result = await processJarvisCommand(message);
-      res.json(result);
+      const text = result.reply || (result as any).text || '';
+      res.json({
+        ...result,
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        text,
+        reply: text,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
     } catch (err: any) {
       console.error('Error processing Jarvis command:', err);
       res.status(500).json({
         error: 'Failed to process command',
         message: err?.message || 'Unknown internal error'
       });
+    }
+  });
+
+  // Free TTS Proxy for resilient audio voice synthesis
+  app.get('/api/tts', async (req: Request, res: Response) => {
+    try {
+      const text = (req.query.text as string || '').trim().slice(0, 300);
+      if (!text) {
+        res.status(400).send('Text required');
+        return;
+      }
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+      const response = await fetch(ttsUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      if (!response.ok) {
+        res.status(502).send('TTS upstream failure');
+        return;
+      }
+      const buffer = await response.arrayBuffer();
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(Buffer.from(buffer));
+    } catch (err) {
+      console.error('TTS endpoint error:', err);
+      res.status(500).send('Internal TTS error');
     }
   });
 

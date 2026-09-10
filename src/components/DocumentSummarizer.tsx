@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { FileText, Upload, Sparkles, CheckCircle2, ListChecks, ArrowRight, FileCheck, Loader2 } from 'lucide-react';
 import { DocumentSummaryResult } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface DocumentSummarizerProps {
-  soundEnabled: boolean;
+  // Free parsing engine props
 }
 
 const SAMPLE_DOCS = [
@@ -45,7 +44,7 @@ SLIDE 3: OPERATIONAL METRICS & GOALS
   }
 ];
 
-export const DocumentSummarizer: React.FC<DocumentSummarizerProps> = ({ soundEnabled }) => {
+export const DocumentSummarizer: React.FC<DocumentSummarizerProps> = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [summaryResult, setSummaryResult] = useState<DocumentSummaryResult | null>(null);
   const [inputText, setInputText] = useState('');
@@ -63,7 +62,6 @@ export const DocumentSummarizer: React.FC<DocumentSummarizerProps> = ({ soundEna
       if (res.ok) {
         const data = await res.json();
         setSummaryResult(data);
-        if (soundEnabled) playJarvisSound('action_done');
       } else {
         alert('Failed to generate summary. Please check your document text.');
       }
@@ -95,7 +93,6 @@ export const DocumentSummarizer: React.FC<DocumentSummarizerProps> = ({ soundEna
   const handleLoadSample = async (sample: typeof SAMPLE_DOCS[0]) => {
     setDocName(sample.title);
     setInputText(sample.content);
-    if (soundEnabled) playJarvisSound('command_ack');
     await processTextForSummary(sample.content, sample.title, sample.type);
   };
 

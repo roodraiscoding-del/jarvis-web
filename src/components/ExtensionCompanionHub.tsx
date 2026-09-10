@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, ShieldAlert, Download, Code, Play, Pause, ArrowDown, ArrowUp, Check, X, ExternalLink, Globe, MonitorCheck } from 'lucide-react';
 import { BrowserTabRule, BrowserAutomationCommand } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface ExtensionHubProps {
-  soundEnabled: boolean;
+  // Companion hub props
 }
 
-export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = ({ soundEnabled }) => {
+export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = () => {
   const [tabRules, setTabRules] = useState<BrowserTabRule[]>([]);
   const [logs, setLogs] = useState<BrowserAutomationCommand[]>([]);
   const [newDomain, setNewDomain] = useState('');
@@ -41,7 +40,6 @@ export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = ({ soundEnable
       const res = await fetch(`/api/tab-rules/${id}/toggle`, { method: 'PATCH' });
       if (res.ok) {
         fetchRulesAndLogs();
-        if (soundEnabled) playJarvisSound('action_done');
       }
     } catch (err) {
       console.error(err);
@@ -61,7 +59,6 @@ export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = ({ soundEnable
       if (res.ok) {
         setNewDomain('');
         fetchRulesAndLogs();
-        if (soundEnabled) playJarvisSound('action_done');
       }
     } catch (err) {
       console.error(err);
@@ -95,10 +92,8 @@ export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = ({ soundEnable
           setSimulatedVideoPlaying(false);
           setLastActionMessage('✓ HTML5 Video Paused (Authorized)');
         }
-        if (soundEnabled) playJarvisSound('action_done');
       } else {
         setLastActionMessage('✕ ACTION REJECTED: Tab domain is NOT in your allowed list. Explicit permission enforced.');
-        if (soundEnabled) playJarvisSound('fallback');
       }
       fetchRulesAndLogs();
     } catch (err) {
@@ -120,7 +115,6 @@ export const ExtensionCompanionHub: React.FC<ExtensionHubProps> = ({ soundEnable
       a.download = 'JARVIS_EXTENSION_SETUP_GUIDE.md';
       a.click();
       URL.revokeObjectURL(url);
-      if (soundEnabled) playJarvisSound('action_done');
     } catch (err) {
       console.error(err);
     }

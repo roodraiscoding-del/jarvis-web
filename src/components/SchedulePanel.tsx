@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Plus, Trash2, CheckCircle2, Circle, AlertCircle, Target, Users, Bell } from 'lucide-react';
 import { Meeting, Reminder, DailyGoal } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface SchedulePanelProps {
   meetings: Meeting[];
   reminders: Reminder[];
   goals: DailyGoal[];
-  soundEnabled: boolean;
   onAddMeeting: (meeting: Omit<Meeting, 'id' | 'createdAt'>) => void;
   onDeleteMeeting: (id: string) => void;
   onToggleReminder: (id: string) => void;
@@ -20,7 +18,6 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
   meetings,
   reminders,
   goals,
-  soundEnabled,
   onAddMeeting,
   onDeleteMeeting,
   onToggleReminder,
@@ -53,7 +50,6 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
     setNewTitle('');
     setNewParticipants('');
     setShowAddMeetingModal(false);
-    if (soundEnabled) playJarvisSound('action_done');
   };
 
   const handleCreateReminder = (e: React.FormEvent) => {
@@ -67,7 +63,6 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
       category: 'work'
     });
     setReminderInput('');
-    if (soundEnabled) playJarvisSound('action_done');
   };
 
   return (
@@ -212,7 +207,6 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
                   <div
                     onClick={() => {
                       onToggleReminder(r.id);
-                      if (soundEnabled) playJarvisSound('action_done');
                     }}
                     className="flex items-center gap-2.5 flex-1 cursor-pointer"
                   >

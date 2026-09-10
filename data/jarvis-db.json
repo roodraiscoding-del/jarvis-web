@@ -1,6 +1,76 @@
 {
   "meetings": [
     {
+      "title": "Scheduled: meeting with Sarah Lin",
+      "date": "2026-09-11",
+      "time": "3 PM",
+      "durationMinutes": 30,
+      "participants": [
+        "User",
+        "Invited Team"
+      ],
+      "notes": "Created from natural language command: \"schedule a sync meeting with Sarah Lin tomorrow at 3 PM\"",
+      "status": "confirmed",
+      "id": "meet-1789072387029",
+      "createdAt": "2026-09-10T20:33:07.029Z"
+    },
+    {
+      "title": "Scheduled: Sync Meeting",
+      "date": "2026-09-11",
+      "time": "2:00 PM",
+      "durationMinutes": 30,
+      "participants": [
+        "User",
+        "Invited Team"
+      ],
+      "notes": "Created from natural language command: \"schedule a strategy sync with Alex Vance tomorrow at 2:00 PM\"",
+      "status": "confirmed",
+      "id": "meet-1789072314375",
+      "createdAt": "2026-09-10T20:31:54.375Z"
+    },
+    {
+      "title": "Scheduled: Sync Meeting",
+      "date": "2026-09-11",
+      "time": "11 AM",
+      "durationMinutes": 30,
+      "participants": [
+        "User",
+        "Invited Team"
+      ],
+      "notes": "Created from natural language command: \"schedule a meeting with Sarah Lin tomorrow at 11 AM\"",
+      "status": "confirmed",
+      "id": "meet-1789072290946",
+      "createdAt": "2026-09-10T20:31:30.946Z"
+    },
+    {
+      "title": "Scheduled: Sync Meeting",
+      "date": "2026-09-11",
+      "time": "14:00",
+      "durationMinutes": 30,
+      "participants": [
+        "User",
+        "Invited Team"
+      ],
+      "notes": "Created from natural language command: \"delete the meeting\"",
+      "status": "confirmed",
+      "id": "meet-1789070910041",
+      "createdAt": "2026-09-10T20:08:30.041Z"
+    },
+    {
+      "title": "Scheduled: Sync Meeting",
+      "date": "2026-09-11",
+      "time": "2:00 PM",
+      "durationMinutes": 30,
+      "participants": [
+        "User",
+        "Invited Team"
+      ],
+      "notes": "Created from natural language command: \"Schedule a strategy meeting with the engineering team tomorrow at 2:00 PM\"",
+      "status": "confirmed",
+      "id": "meet-1789070890520",
+      "createdAt": "2026-09-10T20:08:10.520Z"
+    },
+    {
       "id": "meet-1",
       "title": "AI Product Strategy Sync",
       "date": "2026-09-11",
@@ -31,13 +101,13 @@
   ],
   "reminders": [
     {
-      "id": "rem-1",
-      "title": "Review and approve pending Instagram reel draft",
-      "dueDate": "Today, 18:00",
-      "priority": "high",
+      "title": "check deployment health at 6 PM",
+      "dueDate": "Today, upcoming",
+      "priority": "medium",
       "completed": false,
-      "category": "content",
-      "createdAt": "2026-09-10T19:23:19.405Z"
+      "category": "work",
+      "id": "rem-1789072393930",
+      "createdAt": "2026-09-10T20:33:13.930Z"
     },
     {
       "id": "rem-2",
@@ -46,15 +116,6 @@
       "priority": "medium",
       "completed": true,
       "category": "work",
-      "createdAt": "2026-09-10T19:23:19.405Z"
-    },
-    {
-      "id": "rem-3",
-      "title": "Hydrate and take 15-min screen rest",
-      "dueDate": "Every 2 hours",
-      "priority": "low",
-      "completed": false,
-      "category": "health",
       "createdAt": "2026-09-10T19:23:19.405Z"
     }
   ],
@@ -115,12 +176,14 @@
         "#SoftwareDev",
         "#Jarvis"
       ],
-      "status": "pending_approval",
+      "status": "approved",
       "createdAt": "2026-09-10T17:23:19.405Z",
       "estimatedReach": "3.5K impressions",
       "approvalHistory": [
-        "Drafted via Instagram Skill"
-      ]
+        "Drafted via Instagram Skill",
+        "Approved by User for publication (Direct UI confirmation)"
+      ],
+      "updatedAt": "2026-09-10T19:35:31.728Z"
     }
   ],
   "tabRules": [
@@ -170,8 +233,8 @@
     }
   ],
   "stats": {
-    "totalRequests": 14,
-    "fallbackEvents": 0,
+    "totalRequests": 30,
+    "fallbackEvents": 20,
     "startTime": "2026-09-10T19:23:19.405Z"
   }
 }

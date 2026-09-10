@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Volume2, Music, Radio, Disc3, ExternalLink } from 'lucide-react';
 import { MediaTrack } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface MediaPlayerHUDProps {
-  soundEnabled: boolean;
   externalCommand?: { action: 'play' | 'pause' | 'next'; timestamp: number } | null;
 }
 
@@ -36,7 +34,6 @@ const DEFAULT_PLAYLIST: MediaTrack[] = [
 ];
 
 export const MediaPlayerHUD: React.FC<MediaPlayerHUDProps> = ({
-  soundEnabled,
   externalCommand,
 }) => {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -69,19 +66,16 @@ export const MediaPlayerHUD: React.FC<MediaPlayerHUDProps> = ({
 
   const togglePlay = () => {
     setIsPlaying(prev => !prev);
-    if (soundEnabled) playJarvisSound('command_ack');
   };
 
   const handleNextTrack = () => {
     setCurrentTrackIndex((prev) => (prev + 1) % DEFAULT_PLAYLIST.length);
     setIsPlaying(true);
-    if (soundEnabled) playJarvisSound('command_ack');
   };
 
   const handlePrevTrack = () => {
     setCurrentTrackIndex((prev) => (prev - 1 + DEFAULT_PLAYLIST.length) % DEFAULT_PLAYLIST.length);
     setIsPlaying(true);
-    if (soundEnabled) playJarvisSound('command_ack');
   };
 
   return (

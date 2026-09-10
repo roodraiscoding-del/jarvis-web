@@ -20,7 +20,7 @@ import {
   SystemStatusData,
 } from './types';
 import { Calendar, Share2, Shield, Music, FileText, Compass, Info, CheckCircle2, Sparkles, Mic, Radio } from 'lucide-react';
-import { playJarvisSound } from './utils/audioSynth';
+import { playVoiceButtonSound } from './utils/audioSynth';
 import { speechManager } from './utils/speechService';
 
 export default function App() {
@@ -29,9 +29,6 @@ export default function App() {
     'schedule' | 'workspace' | 'social_approval' | 'browser_companion' | 'summarizer' | 'research' | 'media'
   >('schedule');
   const [isMentorGuideOpen, setIsMentorGuideOpen] = useState(false);
-
-  // Audio FX state
-  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Central Jarvis Mode & Voice Assistant State (Single Source of Truth)
   const [voiceMode, setVoiceMode] = useState<boolean>(false);
@@ -136,21 +133,26 @@ export default function App() {
           throw new Error(`Server returned ${res.status}`);
         }
 
-        const replyData: ChatMessage = await res.json();
+        const rawData = await res.json();
+        const replyText = rawData.text || rawData.reply || '';
+        const replyData: ChatMessage = {
+          ...rawData,
+          id: rawData.id || `msg-${Date.now()}`,
+          role: 'assistant',
+          text: replyText,
+          timestamp: rawData.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
         setMessages((prev) => [...prev, replyData]);
 
         if (replyData.fallbackTriggered) {
           setLastFallbackTriggered(true);
-          if (soundEnabled) playJarvisSound('fallback');
-        } else {
-          if (soundEnabled) playJarvisSound('action_done');
         }
 
-        // If in Voice Assistant Mode (or requested), speak response out loud using Web Speech Synthesis
-        if (shouldSpeak && replyData.text) {
+        // If in Voice Assistant Mode (or requested), speak response out loud using Speech Engine
+        if (shouldSpeak && replyText) {
           setIsSpeaking(true);
           speechManager.speak(
-            replyData.text,
+            replyText,
             () => setIsSpeaking(true),
             () => {
               setIsSpeaking(false);
@@ -177,14 +179,23 @@ export default function App() {
           } else if (actionType === 'draft_social_post') {
             setActiveTab('social_approval');
             await loadSystemState();
-          } else if (actionType === 'schedule_meeting' || actionType === 'set_reminder') {
+          } else if (
+            actionType === 'schedule_meeting' ||
+            actionType === 'delete_meeting' ||
+            actionType === 'view_schedule' ||
+            actionType === 'set_reminder' ||
+            actionType === 'delete_reminder' ||
+            actionType === 'complete_reminder' ||
+            actionType === 'view_reminders' ||
+            actionType === 'manage_goal'
+          ) {
             setActiveTab('schedule');
             await loadSystemState();
           } else if (actionType === 'media_control') {
             setActiveTab('media');
-            const intent = replyData.actionTaken.details?.intent || 'play';
+            const intent = replyData.actionTaken.details?.command || replyData.actionTaken.details?.intent || 'play';
             setExternalMediaCommand({ action: intent, timestamp: Date.now() });
-          } else if (actionType === 'browse_tab') {
+          } else if (actionType === 'browse_tab' || actionType === 'browser_automation') {
             setActiveTab('browser_companion');
           } else if (actionType === 'web_research') {
             setActiveTab('research');
@@ -210,7 +221,7 @@ export default function App() {
       }
     },
     // Note: startListeningLoop is referenced inside callback closure
-    [isProcessing, loadSystemState, soundEnabled]
+    [isProcessing, loadSystemState]
   );
 
   const startListeningLoop = useCallback(() => {
@@ -254,12 +265,11 @@ export default function App() {
 
     setSpeechError(null);
     setSpeechTranscript('');
-    if (soundEnabled) {
-      playJarvisSound('command_ack');
-    }
+    playVoiceButtonSound('activate');
+    speechManager.primeVoiceEngine();
 
     startListeningLoop();
-  }, [soundEnabled, startListeningLoop]);
+  }, [startListeningLoop]);
 
   const toggleVoiceMode = useCallback(() => {
     setVoiceMode((prev) => {
@@ -270,13 +280,11 @@ export default function App() {
       } else {
         stopVoiceAssistant();
         setFocusTrigger((c) => c + 1);
-        if (soundEnabled) {
-          playJarvisSound('action_done');
-        }
+        playVoiceButtonSound('deactivate');
       }
       return next;
     });
-  }, [startVoiceAssistant, stopVoiceAssistant, soundEnabled]);
+  }, [startVoiceAssistant, stopVoiceAssistant]);
 
   // Keyboard shortcut listener: Spacebar toggles voice mode
   // Only triggers when no text input/textarea/select is focused so it doesn't interfere with typing
@@ -477,8 +485,6 @@ export default function App() {
       {/* Top Sci-Fi Navigation HUD */}
       <HeaderHUD
         statusData={statusData}
-        soundEnabled={soundEnabled}
-        onToggleSound={() => setSoundEnabled((prev) => !prev)}
         onOpenMentorGuide={() => setIsMentorGuideOpen(true)}
         onRefreshStatus={loadSystemState}
         onToggleSimulatedRateLimit={handleToggleSimulatedRateLimit}
@@ -493,7 +499,6 @@ export default function App() {
           <div className="lg:col-span-4 flex flex-col">
             <ArcReactorVisualizer
               isProcessing={isProcessing}
-              soundEnabled={soundEnabled}
               activeModelName={activeModelName}
               fallbackTriggered={lastFallbackTriggered}
               voiceMode={voiceMode}
@@ -659,17 +664,25 @@ export default function App() {
             <CommandTerminal
               messages={messages}
               isProcessing={isProcessing}
-              soundEnabled={soundEnabled}
               onSendCommand={handleSendCommand}
               voiceMode={voiceMode}
               focusTrigger={focusTrigger}
+              onSpeakMessage={(text) => {
+                setIsSpeaking(true);
+                speechManager.speak(
+                  text,
+                  () => setIsSpeaking(true),
+                  () => setIsSpeaking(false),
+                  () => setIsSpeaking(false)
+                );
+              }}
             />
           </div>
 
           {/* Active Workspace Deck */}
           <div className="lg:col-span-6 w-full">
             {activeTab === 'workspace' && (
-              <GoogleWorkspaceHub soundEnabled={soundEnabled} />
+              <GoogleWorkspaceHub />
             )}
 
             {activeTab === 'schedule' && (
@@ -677,7 +690,6 @@ export default function App() {
                 meetings={meetings}
                 reminders={reminders}
                 goals={goals}
-                soundEnabled={soundEnabled}
                 onAddMeeting={handleAddMeeting}
                 onDeleteMeeting={handleDeleteMeeting}
                 onToggleReminder={handleToggleReminder}
@@ -690,7 +702,6 @@ export default function App() {
             {activeTab === 'social_approval' && (
               <SocialApprovalQueue
                 drafts={socialDrafts}
-                soundEnabled={soundEnabled}
                 onApproveDraft={handleApproveDraft}
                 onRejectDraft={handleRejectDraft}
                 onPublishDraft={handleApproveDraft}
@@ -699,23 +710,21 @@ export default function App() {
             )}
 
             {activeTab === 'browser_companion' && (
-              <ExtensionCompanionHub soundEnabled={soundEnabled} />
+              <ExtensionCompanionHub />
             )}
 
             {activeTab === 'summarizer' && (
-              <DocumentSummarizer soundEnabled={soundEnabled} />
+              <DocumentSummarizer />
             )}
 
             {activeTab === 'research' && (
               <WebResearchHub
-                soundEnabled={soundEnabled}
                 onDraftFromTrend={handleDraftFromTrend}
               />
             )}
 
             {activeTab === 'media' && (
               <MediaPlayerHUD
-                soundEnabled={soundEnabled}
                 externalCommand={externalMediaCommand}
               />
             )}

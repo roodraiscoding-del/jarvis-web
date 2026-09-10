@@ -21,24 +21,35 @@ export function getProviderMatrix(): ModelProviderInfo[] {
   return [
     {
       id: 'gemini-flash',
-      name: 'Google Gemini 3.8 Flash',
+      name: 'Google Gemini 3.8 Flash (Primary)',
       provider: 'gemini',
       modelName: 'gemini-3.8-flash',
       tier: 'Free Tier',
       status: forceSimulatedRateLimit ? 'rate_limited' : (geminiAvailable ? 'operational' : 'standby'),
       latencyMs: 380,
       isCurrentPrimary: !forceSimulatedRateLimit && geminiAvailable,
-      quotaDescription: 'Free tier 15 RPM / 1M TPM (Zero Cost)'
+      quotaDescription: 'Google AI Studio Free Tier (Primary Core)'
+    },
+    {
+      id: 'gemini-lite',
+      name: 'Google Gemini 3.1 Flash-Lite (Instant Failover)',
+      provider: 'gemini',
+      modelName: 'gemini-3.1-flash-lite',
+      tier: 'Free Tier',
+      status: forceSimulatedRateLimit ? 'rate_limited' : (geminiAvailable ? 'operational' : 'standby'),
+      latencyMs: 210,
+      isCurrentPrimary: false,
+      quotaDescription: 'High-speed separate quota failover model'
     },
     {
       id: 'groq-llama',
-      name: 'Groq LLaMA 3.3 (Fast Failover)',
+      name: 'Groq LLaMA 3.3 (Fast Cloud Failover)',
       provider: 'groq',
       modelName: 'llama-3.3-70b-versatile',
       tier: 'Free Tier',
       status: groqAvailable ? 'operational' : 'standby',
       latencyMs: 190,
-      isCurrentPrimary: (forceSimulatedRateLimit || !geminiAvailable) && groqAvailable,
+      isCurrentPrimary: false,
       quotaDescription: 'Free tier 30 RPM (Zero Cost)'
     },
     {
@@ -49,7 +60,7 @@ export function getProviderMatrix(): ModelProviderInfo[] {
       tier: 'Free Tier',
       status: openRouterAvailable ? 'operational' : 'standby',
       latencyMs: 520,
-      isCurrentPrimary: !geminiAvailable && !groqAvailable && openRouterAvailable,
+      isCurrentPrimary: false,
       quotaDescription: 'Free tier open models (Zero Cost)'
     },
     {
@@ -101,7 +112,11 @@ When responding:
 /**
  * Core LLM caller with multi-provider cascade failover
  */
-export async function executeAiQueryWithFallback(prompt: string, contextPrompt?: string): Promise<{
+export async function executeAiQueryWithFallback(
+  prompt: string,
+  contextPrompt?: string,
+  actionTaken?: ProcessCommandResult['actionTaken']
+): Promise<{
   text: string;
   providerUsed: string;
   modelUsed: string;
@@ -110,23 +125,26 @@ export async function executeAiQueryWithFallback(prompt: string, contextPrompt?:
   fallbackChain: string[];
 }> {
   const fallbackChain: string[] = [];
-  const fullPrompt = contextPrompt ? `${contextPrompt}\n\nUser request: ${prompt}` : prompt;
+  const fullPrompt = contextPrompt ? `${contextPrompt}\n\nUser command/prompt: ${prompt}` : prompt;
 
   // -------------------------------------------------------------
-  // Provider 1: Google Gemini 3.8 Flash (Free Tier)
+  // Provider 1: Google Gemini Models (Free Tier Multi-Model Cascade)
+  // 1a: Primary: gemini-3.8-flash
+  // 1b: Instant Free Failover: gemini-3.1-flash-lite
   // -------------------------------------------------------------
   if (process.env.GEMINI_API_KEY && !forceSimulatedRateLimit) {
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+
+    // Attempt 1a: gemini-3.8-flash
     try {
       fallbackChain.push('Google Gemini 3.8 Flash (Checking)');
-      const ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build'
-          }
-        }
-      });
-
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: fullPrompt,
@@ -148,9 +166,38 @@ export async function executeAiQueryWithFallback(prompt: string, contextPrompt?:
         };
       }
     } catch (err: any) {
-      console.warn('[Jarvis Failover] Gemini call hit limit or failed, initiating fallback cascade:', err?.message || err);
+      console.warn('[Jarvis Failover] Gemini 3.8 Flash rate limit or error, cascading to Gemini 3.1 Flash-Lite:', err?.message || err);
       storage.recordFallback();
-      fallbackChain[fallbackChain.length - 1] = `Google Gemini (Failed: ${err?.status || 'Rate Limit/Error'})`;
+      fallbackChain[fallbackChain.length - 1] = `Google Gemini 3.8 Flash (Limit: ${err?.status || 429})`;
+
+      // Attempt 1b: gemini-3.1-flash-lite (high-speed free failover model)
+      try {
+        fallbackChain.push('Google Gemini 3.1 Flash-Lite (Failover Checking)');
+        const liteResponse = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: fullPrompt,
+          config: {
+            systemInstruction: JARVIS_SYSTEM_PROMPT,
+            temperature: 0.7
+          }
+        });
+
+        const liteText = liteResponse.text?.trim();
+        if (liteText) {
+          fallbackChain[fallbackChain.length - 1] = 'Google Gemini 3.1 Flash-Lite (Failover Success)';
+          return {
+            text: liteText,
+            providerUsed: 'Google Gemini (Flash-Lite Free Failover)',
+            modelUsed: 'gemini-3.1-flash-lite',
+            fallbackTriggered: true,
+            fallbackReason: 'Primary 3.8 Flash quota reached - seamless failover to Gemini 3.1 Flash-Lite',
+            fallbackChain
+          };
+        }
+      } catch (liteErr: any) {
+        console.warn('[Jarvis Failover] Gemini 3.1 Flash-Lite also exhausted, cascading to next provider:', liteErr?.message || liteErr);
+        fallbackChain[fallbackChain.length - 1] = `Google Gemini 3.1 Flash-Lite (Limit: ${liteErr?.status || 429})`;
+      }
     }
   } else if (forceSimulatedRateLimit) {
     storage.recordFallback();
@@ -250,12 +297,12 @@ export async function executeAiQueryWithFallback(prompt: string, contextPrompt?:
 
   // -------------------------------------------------------------
   // Provider 4: Autonomous Jarvis Edge Reasoning Engine (Local Fallback)
-  // Ensures Jarvis NEVER crashes or returns a blank page!
+  // Ensures Jarvis NEVER crashes or leaves the user stranded!
   // -------------------------------------------------------------
   fallbackChain.push('Jarvis Edge Reasoning Engine (Active)');
   storage.recordFallback();
 
-  const synthesizedReply = synthesizeFallbackResponse(prompt);
+  const synthesizedReply = synthesizeFallbackResponse(prompt, actionTaken);
 
   return {
     text: synthesizedReply,
@@ -275,7 +322,7 @@ export async function executeAiQueryWithFallback(prompt: string, contextPrompt?:
  * executes the state update in `storage`, and calls the LLM with the context.
  */
 export async function processJarvisCommand(userCommand: string): Promise<ProcessCommandResult> {
-  const lower = userCommand.toLowerCase();
+  const lower = userCommand.toLowerCase().trim();
   storage.recordRequest();
 
   let actionTaken: ProcessCommandResult['actionTaken'] = undefined;
@@ -313,17 +360,84 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
     contextForAi = `GOOGLE WORKSPACE COMMAND: The user requested an action for Google ${service} ("${userCommand}"). The Google Workspace console has been engaged. Advise the user that they can review, authorize, and trigger their requested ${service} items directly within the Google Workspace Hub with end-user confirmation safeguards.`;
   }
 
-  // 1. Meeting Scheduling Command Detection
-  else if (lower.includes('schedule') || lower.includes('meeting') || lower.includes('calendar') || lower.includes('book an appointment')) {
-    const titleMatch = userCommand.match(/schedule (?:a )?(?:meeting (?:with|for|about)?\s*)?([^at|on|for]+)/i);
-    const title = titleMatch && titleMatch[1]?.trim().length > 3
-      ? titleMatch[1].replace(/at \d+.*|tomorrow|next week/gi, '').trim()
-      : 'Sync Meeting';
+  // 1A. DELETE / CANCEL / REMOVE MEETING
+  else if (
+    (lower.includes('delete') || lower.includes('cancel') || lower.includes('remove') || lower.includes('drop') || lower.includes('clear')) &&
+    (lower.includes('meeting') || lower.includes('appointment') || lower.includes('sync') || lower.includes('calendar event'))
+  ) {
+    const allMeetings = storage.getMeetings();
+    if (allMeetings.length === 0) {
+      actionTaken = {
+        type: 'delete_meeting',
+        description: 'No active meetings found on your calendar to cancel.',
+        details: { found: false }
+      };
+      contextForAi = `USER COMMAND: "${userCommand}". There are currently no meetings scheduled in the agenda to delete. Inform the user respectfully.`;
+    } else {
+      // Check if a specific meeting ID or title keyword was mentioned
+      const searchTerms = lower.replace(/delete|cancel|remove|clear|drop|the|meeting|sync|appointment|call|event/gi, '').trim();
+      let target = allMeetings.find(m => {
+        const mTitle = m.title.toLowerCase();
+        if (lower.includes(m.id.toLowerCase())) return true;
+        if (searchTerms && mTitle.includes(searchTerms)) return true;
+        const words = searchTerms.split(/\s+/).filter(w => w.length > 2);
+        return words.length > 0 && words.some(w => mTitle.includes(w));
+      });
+
+      // Default to the first/most recent meeting if not specified (e.g. "delete the meeting")
+      if (!target) {
+        target = allMeetings[0];
+      }
+
+      storage.deleteMeeting(target.id);
+      actionTaken = {
+        type: 'delete_meeting',
+        description: `Meeting canceled and removed: "${target.title}" (${target.date} at ${target.time})`,
+        details: target
+      };
+      contextForAi = `SYSTEM ACTION COMPLETED: Successfully canceled and deleted the meeting "${target.title}" (scheduled for ${target.date} at ${target.time}). Confirm this deletion politely and clearly to the user.`;
+    }
+  }
+
+  // 1B. VIEW / LIST / CHECK SCHEDULE OR MEETINGS
+  else if (
+    (lower.includes('what') || lower.includes('show') || lower.includes('view') || lower.includes('check') || lower.includes('list') || lower.includes('get') || lower.includes('display')) &&
+    (lower.includes('schedule') || lower.includes('meeting') || lower.includes('agenda') || lower.includes('calendar') || lower.includes('appointments')) ||
+    lower === 'schedule' || lower === 'meetings' || lower === 'agenda' || lower === 'calendar' || lower.includes('today schedule') || lower.includes('upcoming schedule')
+  ) {
+    const allMeetings = storage.getMeetings();
+    const meetingSummaries = allMeetings.length > 0
+      ? allMeetings.map(m => `• "${m.title}" on ${m.date} at ${m.time} (${m.durationMinutes}m)`).join('\n')
+      : 'No meetings currently scheduled in your agenda.';
+
+    actionTaken = {
+      type: 'view_schedule',
+      description: `Retrieved ${allMeetings.length} scheduled meeting(s) from your agenda.`,
+      details: { count: allMeetings.length, meetings: allMeetings }
+    };
+    contextForAi = `CALENDAR SCHEDULE RETRIEVED: Here are the user's scheduled meetings:\n${meetingSummaries}\nReport this schedule politely and concisely to the user.`;
+  }
+
+  // 1C. SCHEDULE / BOOK / CREATE MEETING
+  else if (
+    (lower.includes('schedule') || lower.includes('book') || lower.includes('create meeting') || lower.includes('add meeting') || lower.includes('new meeting') || lower.includes('set up a meeting') || lower.includes('arrange a meeting')) &&
+    !lower.includes('delete') && !lower.includes('cancel') && !lower.includes('remove')
+  ) {
+    let extracted = userCommand
+      .replace(/^(?:please\s+)?(?:schedule|book|create|add|set up|arrange)\s+(?:a\s+)?(?:meeting|appointment|call|sync)?(?:\s+(?:with|for|about)\s+)?/i, '')
+      .replace(/\s+(?:at\s+\d+|tomorrow|today|next\s+week|on\s+\w+).*$/i, '')
+      .replace(/^[:\-\s]+|[:\-\s]+$/g, '')
+      .trim();
+
+    const title = extracted.length >= 2 ? extracted : 'Sync Meeting';
 
     // Default to tomorrow 14:00 if not specified
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
+    let dateStr = tomorrow.toISOString().split('T')[0];
+    if (lower.includes('today')) {
+      dateStr = new Date().toISOString().split('T')[0];
+    }
 
     const timeMatch = userCommand.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
     const timeStr = timeMatch ? timeMatch[1] : '14:00';
@@ -347,11 +461,96 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
     contextForAi = `SYSTEM ACTION COMPLETED: You successfully scheduled the meeting "${newMeeting.title}" for ${newMeeting.date} at ${newMeeting.time}. Confirm this politely to the user.`;
   }
 
-  // 2. Reminder & Goal Setting
-  else if (lower.includes('remind me') || lower.includes('set a reminder') || lower.includes('add reminder') || lower.includes('goal')) {
+  // 2A. DELETE / REMOVE REMINDER
+  else if (
+    (lower.includes('delete') || lower.includes('remove') || lower.includes('clear')) &&
+    (lower.includes('reminder') || lower.includes('task'))
+  ) {
+    const rems = storage.getReminders();
+    if (rems.length === 0) {
+      actionTaken = {
+        type: 'delete_reminder',
+        description: 'No active reminders found to delete.',
+        details: { found: false }
+      };
+      contextForAi = `USER COMMAND: "${userCommand}". No reminders were found in your local database. Inform the user.`;
+    } else {
+      const searchTerms = lower.replace(/delete|remove|clear|drop|the|reminder|task/gi, '').trim();
+      const target = rems.find(r => {
+        const rTitle = r.title.toLowerCase();
+        if (lower.includes(r.id.toLowerCase())) return true;
+        if (searchTerms && rTitle.includes(searchTerms)) return true;
+        const words = searchTerms.split(/\s+/).filter(w => w.length > 2);
+        return words.length > 0 && words.some(w => rTitle.includes(w));
+      }) || rems[0];
+
+      storage.deleteReminder(target.id);
+      actionTaken = {
+        type: 'delete_reminder',
+        description: `Deleted reminder: "${target.title}"`,
+        details: target
+      };
+      contextForAi = `SYSTEM ACTION COMPLETED: Deleted reminder "${target.title}" from local database. Confirm this politely to the user.`;
+    }
+  }
+
+  // 2B. COMPLETE / MARK REMINDER AS DONE
+  else if (
+    (lower.includes('complete') || lower.includes('done') || lower.includes('finish') || lower.includes('check off')) &&
+    (lower.includes('reminder') || lower.includes('task'))
+  ) {
+    const rems = storage.getReminders();
+    const searchTerms = lower.replace(/complete|done|finish|check off|mark|the|reminder|task/gi, '').trim();
+    const target = rems.find(r => {
+      if (r.completed) return false;
+      const rTitle = r.title.toLowerCase();
+      if (lower.includes(r.id.toLowerCase())) return true;
+      if (searchTerms && rTitle.includes(searchTerms)) return true;
+      const words = searchTerms.split(/\s+/).filter(w => w.length > 2);
+      return words.length > 0 && words.some(w => rTitle.includes(w));
+    }) || rems.find(r => !r.completed);
+
+    if (target) {
+      storage.toggleReminder(target.id);
+      actionTaken = {
+        type: 'complete_reminder',
+        description: `Marked reminder as completed: "${target.title}"`,
+        details: target
+      };
+      contextForAi = `SYSTEM ACTION COMPLETED: Marked reminder "${target.title}" as completed. Confirm this to the user.`;
+    } else {
+      actionTaken = {
+        type: 'complete_reminder',
+        description: 'All pending reminders are already completed.',
+        details: { found: false }
+      };
+      contextForAi = `USER COMMAND: "${userCommand}". All reminders are already checked off. Inform the user.`;
+    }
+  }
+
+  // 2C. VIEW / LIST REMINDERS
+  else if (
+    (lower.includes('what') || lower.includes('show') || lower.includes('view') || lower.includes('check') || lower.includes('list')) &&
+    (lower.includes('reminder') || lower.includes('tasks'))
+  ) {
+    const rems = storage.getReminders();
+    const remSummaries = rems.length > 0
+      ? rems.map(r => `• [${r.completed ? 'DONE' : 'PENDING'}] "${r.title}" (Due: ${r.dueDate}, Priority: ${r.priority})`).join('\n')
+      : 'No reminders currently registered.';
+
+    actionTaken = {
+      type: 'view_reminders',
+      description: `Retrieved ${rems.length} reminder(s) from your task list.`,
+      details: { count: rems.length, reminders: rems }
+    };
+    contextForAi = `REMINDERS RETRIEVED:\n${remSummaries}\nReport these tasks politely to the user.`;
+  }
+
+  // 2D. SET / ADD REMINDER OR GOAL
+  else if (lower.includes('remind me') || lower.includes('set a reminder') || lower.includes('add reminder') || lower.includes('new reminder') || lower.includes('goal')) {
     const isGoal = lower.includes('goal');
     if (isGoal) {
-      const goalTitle = userCommand.replace(/add goal|set goal|new goal/gi, '').trim() || 'Accomplish key daily objectives';
+      const goalTitle = userCommand.replace(/add goal|set goal|new goal|create goal/gi, '').trim() || 'Accomplish key daily objectives';
       const newGoal = storage.addGoal({
         title: goalTitle,
         target: 'Daily Completion',
@@ -359,13 +558,13 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
         progressPercent: 0
       });
       actionTaken = {
-        type: 'set_goal',
+        type: 'manage_goal',
         description: `New daily goal logged: "${newGoal.title}"`,
         details: newGoal
       };
       contextForAi = `SYSTEM ACTION COMPLETED: Added new goal "${newGoal.title}" to daily goals list.`;
     } else {
-      const reminderTitle = userCommand.replace(/remind me to|set a reminder to|add reminder/gi, '').trim() || 'Follow up on pending task';
+      const reminderTitle = userCommand.replace(/remind me to|set a reminder to|add reminder|new reminder/gi, '').trim() || 'Follow up on pending task';
       const newRem = storage.addReminder({
         title: reminderTitle,
         dueDate: 'Today, upcoming',
@@ -456,17 +655,18 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
   }
 
   // 6. Media / Music Control
-  else if (lower.includes('play music') || lower.includes('play song') || lower.includes('play synthwave') || lower.includes('play lofi') || lower.includes('pause music')) {
+  else if (lower.includes('play music') || lower.includes('play song') || lower.includes('play synthwave') || lower.includes('play lofi') || lower.includes('pause music') || lower.includes('stop music')) {
+    const isPause = lower.includes('pause') || lower.includes('stop');
     actionTaken = {
       type: 'media_control',
-      description: lower.includes('pause') ? 'Paused in-browser audio player' : 'Activated cybernetic synthwave & lofi audio stream',
-      details: { command: lower.includes('pause') ? 'pause' : 'play' }
+      description: isPause ? 'Paused in-browser audio player' : 'Activated cybernetic synthwave & lofi audio stream',
+      details: { command: isPause ? 'pause' : 'play' }
     };
     contextForAi = `MEDIA CONTROLLER: Jarvis media player state updated (${actionTaken.description}). Acknowledge in your response.`;
   }
 
-  // Call Multi-Model Fallback AI with assembled context
-  const aiResult = await executeAiQueryWithFallback(userCommand, contextForAi);
+  // Call Multi-Model Fallback AI with assembled context and action details
+  const aiResult = await executeAiQueryWithFallback(userCommand, contextForAi, actionTaken);
 
   return {
     reply: aiResult.text,
@@ -482,28 +682,61 @@ export async function processJarvisCommand(userCommand: string): Promise<Process
 
 /**
  * Intelligent deterministic fallback responder for offline/quota situations
+ * Generates tailored, context-aware responses matching the user action and Jarvis persona.
  */
-function synthesizeFallbackResponse(prompt: string): string {
+function synthesizeFallbackResponse(prompt: string, actionTaken?: ProcessCommandResult['actionTaken']): string {
   const lower = prompt.toLowerCase();
 
-  if (lower.includes('hello') || lower.includes('hi') || lower.includes('jarvis')) {
-    return 'Greetings, Sir. All systems are operational. I am connected via the Jarvis Edge Fallback Engine. How may I assist your schedule, media, research, or content workflows today?';
+  // If a precise system action was dispatched, provide a matching confirmation
+  if (actionTaken) {
+    if (actionTaken.type === 'delete_meeting') {
+      return `At your command, Sir. ${actionTaken.description}. Your Schedule HUD has been updated.`;
+    }
+    if (actionTaken.type === 'schedule_meeting') {
+      return `At your command, Sir. ${actionTaken.description}. The meeting has been confirmed in your schedule.`;
+    }
+    if (actionTaken.type === 'view_schedule') {
+      return `At your command, Sir. ${actionTaken.description} You can review the full schedule in the Schedule HUD panel below.`;
+    }
+    if (actionTaken.type === 'delete_reminder') {
+      return `At your command, Sir. ${actionTaken.description}.`;
+    }
+    if (actionTaken.type === 'complete_reminder') {
+      return `Task completed, Sir. ${actionTaken.description}.`;
+    }
+    if (actionTaken.type === 'set_reminder') {
+      return `Reminder registered, Sir. ${actionTaken.description}.`;
+    }
+    if (actionTaken.type === 'view_reminders') {
+      return `At your command, Sir. ${actionTaken.description}.`;
+    }
+    if (actionTaken.type === 'manage_goal') {
+      return `Daily goal logged, Sir: "${actionTaken.details?.title}".`;
+    }
+    if (actionTaken.type === 'draft_social_post') {
+      return `Understood. In accordance with your strict safety policy, I have generated a social media draft and queued it in Pending Approvals. It will never be published without your direct confirmation in the UI.`;
+    }
+    if (actionTaken.type === 'browser_automation') {
+      return `Browser automation signal dispatched (${actionTaken.description}). Commands are strictly isolated to tabs approved in your Jarvis Companion extension.`;
+    }
+    if (actionTaken.type === 'media_control') {
+      return `Audio stream updated. ${actionTaken.description}.`;
+    }
+    if (actionTaken.type === 'google_workspace') {
+      return `${actionTaken.description} You can review and authorize this action securely in the Google Workspace Hub.`;
+    }
+    if (actionTaken.type === 'web_research') {
+      return `Web research completed for your query. ${actionTaken.description}.`;
+    }
   }
 
-  if (lower.includes('schedule') || lower.includes('meeting')) {
-    return 'Meeting recorded and added to your calendar agenda. You can view, modify, or sync it directly in the Schedule HUD panel below.';
+  // Conversational fallbacks
+  if (lower.includes('hello') || lower.includes('hi') || lower.includes('jarvis') || lower.includes('hey')) {
+    return 'Greetings, Sir. All systems are operational. I am running via the Jarvis Edge Fallback Engine. How may I assist your schedule, media, research, or content workflows today?';
   }
 
-  if (lower.includes('remind') || lower.includes('reminder') || lower.includes('goal')) {
-    return 'Reminder registered successfully in the local persistent database. Jarvis will keep this tracked on your HUD task monitor.';
-  }
-
-  if (lower.includes('draft') || lower.includes('post') || lower.includes('youtube') || lower.includes('instagram')) {
-    return 'Understood. In accordance with your strict safety rule, I have generated a comprehensive social media draft and placed it in your Pending Approvals queue. No post will ever be published without your explicit confirmation in the UI.';
-  }
-
-  if (lower.includes('scroll') || lower.includes('video') || lower.includes('browser') || lower.includes('tab')) {
-    return 'Browser automation signal dispatched. In adherence to your safety protocol, commands only affect tabs you have explicitly enabled in the Jarvis Companion extension popup.';
+  if (lower.includes('who are you') || lower.includes('what are you') || lower.includes('what can you do')) {
+    return 'I am Jarvis, your personal AI executive web assistant. I manage your daily schedule, Google Workspace tools, social media draft approvals, background research, and cybernetic focus audio—engineered with multi-model failover for 100% uptime.';
   }
 
   if (lower.includes('summarize') || lower.includes('document') || lower.includes('pdf')) {

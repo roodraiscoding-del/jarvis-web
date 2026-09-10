@@ -53,7 +53,6 @@ import {
   WorkspaceConfirmationModal,
   ConfirmationDialogState
 } from './WorkspaceConfirmationModal';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface QuickNote {
   id: string;
@@ -65,13 +64,9 @@ interface QuickNote {
   createdAt: string;
 }
 
-interface GoogleWorkspaceHubProps {
-  soundEnabled?: boolean;
-}
+interface GoogleWorkspaceHubProps {}
 
-export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = ({
-  soundEnabled = true
-}) => {
+export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = () => {
   // Auth State
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -183,9 +178,6 @@ export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = ({
 
   const notify = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     setStatusNotification({ message, type });
-    if (soundEnabled && type === 'success') {
-      playJarvisSound('action_done');
-    }
     setTimeout(() => setStatusNotification(null), 4000);
   };
 
@@ -194,7 +186,6 @@ export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = ({
     setIsAuthenticating(true);
     setAuthError(null);
     try {
-      if (soundEnabled) playJarvisSound('command_ack');
       const res = await googleSignIn();
       if (res) {
         notify(`Authenticated as ${res.user.displayName || res.user.email}`, 'success');

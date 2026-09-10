@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Check, X, Edit3, Youtube, Instagram, Facebook, Send, Clock, Sparkles } from 'lucide-react';
 import { SocialDraft } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface SocialApprovalQueueProps {
   drafts: SocialDraft[];
-  soundEnabled: boolean;
   onApproveDraft: (id: string, notes?: string) => void;
   onRejectDraft: (id: string, notes?: string) => void;
   onPublishDraft: (id: string) => void;
@@ -14,7 +12,6 @@ interface SocialApprovalQueueProps {
 
 export const SocialApprovalQueue: React.FC<SocialApprovalQueueProps> = ({
   drafts,
-  soundEnabled,
   onApproveDraft,
   onRejectDraft,
   onPublishDraft,
@@ -50,7 +47,6 @@ export const SocialApprovalQueue: React.FC<SocialApprovalQueueProps> = ({
   const handleSaveEdit = (draft: SocialDraft) => {
     draft.content = editedContent;
     setEditingId(null);
-    if (soundEnabled) playJarvisSound('action_done');
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -67,7 +63,6 @@ export const SocialApprovalQueue: React.FC<SocialApprovalQueueProps> = ({
     setNewContent('');
     setNewTags('');
     setShowCreateModal(false);
-    if (soundEnabled) playJarvisSound('action_done');
   };
 
   return (
@@ -185,20 +180,14 @@ export const SocialApprovalQueue: React.FC<SocialApprovalQueueProps> = ({
                       <span>Edit</span>
                     </button>
                     <button
-                      onClick={() => {
-                        onRejectDraft(draft.id);
-                        if (soundEnabled) playJarvisSound('fallback');
-                      }}
+                      onClick={() => onRejectDraft(draft.id)}
                       className="flex items-center gap-1 px-2.5 py-1 rounded bg-red-950/60 hover:bg-red-900/60 border border-red-800 text-red-300 text-[11px] transition-colors"
                     >
                       <X className="w-3 h-3" />
                       <span>Reject</span>
                     </button>
                     <button
-                      onClick={() => {
-                        onApproveDraft(draft.id);
-                        if (soundEnabled) playJarvisSound('action_done');
-                      }}
+                      onClick={() => onApproveDraft(draft.id)}
                       className="flex items-center gap-1 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-[11px] transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                     >
                       <Check className="w-3 h-3" />

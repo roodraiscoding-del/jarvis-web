@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Radio, CloudSun, Volume2, VolumeX, BookOpen, RefreshCw, Cpu } from 'lucide-react';
+import { Shield, Radio, CloudSun, BookOpen, RefreshCw, Cpu } from 'lucide-react';
 import { SystemStatusData, ModelProviderInfo } from '../types';
-import { playJarvisSound } from '../utils/audioSynth';
 
 interface HeaderHUDProps {
   statusData: SystemStatusData | null;
-  soundEnabled: boolean;
-  onToggleSound: () => void;
   onOpenMentorGuide: () => void;
   onRefreshStatus: () => void;
   onToggleSimulatedRateLimit: () => void;
@@ -15,8 +12,6 @@ interface HeaderHUDProps {
 
 export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   statusData,
-  soundEnabled,
-  onToggleSound,
   onOpenMentorGuide,
   onRefreshStatus,
   onToggleSimulatedRateLimit,
@@ -132,26 +127,13 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           {/* Test Simulated Rate Limit (Demonstrates the hard constraint failover) */}
           <button
             id="toggle-rate-limit-btn"
-            onClick={() => {
-              onToggleSimulatedRateLimit();
-              if (soundEnabled) playJarvisSound('fallback');
-            }}
+            onClick={onToggleSimulatedRateLimit}
             title="Simulate primary Gemini 429 quota exhaustion to verify auto-failover to Groq / Edge Fallback"
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-md border border-amber-500/40 bg-amber-950/30 text-amber-300 hover:bg-amber-900/40 transition-colors"
           >
             <Radio className="w-3 h-3" />
             <span className="hidden sm:inline">Simulate 429 Failover</span>
             <span className="sm:hidden">429 Test</span>
-          </button>
-
-          {/* Audio Synthesizer toggle */}
-          <button
-            id="audio-synth-toggle-btn"
-            onClick={onToggleSound}
-            title={soundEnabled ? 'Mute Jarvis Cyber Audio FX' : 'Enable Jarvis Cyber Audio FX'}
-            className="p-1.5 rounded-md border border-slate-800 bg-slate-900 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors"
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-cyan-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
           </button>
 
           {/* Refresh system metrics */}
