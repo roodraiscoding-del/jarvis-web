@@ -1,0 +1,25 @@
+# Jarvis Local Agent - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Browser Automation & YouTube Control
+playwright>=1.40.0
+
+# Desktop Automation & Hotkeys
+pyautogui>=0.9.54
+keyboard>=0.13.5
+
+# Window Management (Platform-specific helpers handled in code)
+PyGetWindow>=0.0.9; sys_platform == 'win32'
+
+# Optional Audio / Volume control
+pycaw>=20240210; sys_platform == 'win32'
+
+# Speech & Audio
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+
+# Local HTTP Gateway (Connecting Web App to Python Agent)
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.5.0
+requests>=2.31.0
