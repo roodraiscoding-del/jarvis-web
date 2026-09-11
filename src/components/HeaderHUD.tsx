@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Radio, CloudSun, BookOpen, RefreshCw, Cpu, MapPin, Navigation, Loader2, Search, X, CheckCircle2, Wind, Droplets } from 'lucide-react';
+import { Shield, Radio, CloudSun, BookOpen, RefreshCw, Cpu, MapPin, Navigation, Loader2, Search, X, CheckCircle2, Wind, Droplets, Calendar, Clock, Check, Globe } from 'lucide-react';
 import { SystemStatusData, ModelProviderInfo } from '../types';
+import { getDeviceTimeInfo, checkLiveSystemTime, DeviceTimeInfo } from '../utils/dateTimeUtils';
 
 interface HeaderHUDProps {
   statusData: SystemStatusData | null;
@@ -17,36 +18,41 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   onToggleSimulatedRateLimit,
   voiceMode = false,
 }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
+  const [deviceTime, setDeviceTime] = useState<DeviceTimeInfo>(() => getDeviceTimeInfo());
+  const [use24Hour, setUse24Hour] = useState<boolean>(false);
+  const [showClockModal, setShowClockModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [searchCity, setSearchCity] = useState<string>('');
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [locationFeedback, setLocationFeedback] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const clockModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const update = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setDeviceTime(getDeviceTimeInfo());
     };
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Close modal when clicking outside
+  // Close modals when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         setShowLocationModal(false);
       }
+      if (clockModalRef.current && !clockModalRef.current.contains(e.target as Node)) {
+        setShowClockModal(false);
+      }
     };
-    if (showLocationModal) {
+    if (showLocationModal || showClockModal) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLocationModal]);
+  }, [showLocationModal, showClockModal]);
 
   const activeProvider = statusData?.providers.find((p) => p.isCurrentPrimary) || statusData?.providers[0];
 
@@ -182,11 +188,98 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
 
         {/* System Vitals: Clock, Weather, Active Model */}
         <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs font-mono relative">
-          {/* Real-time Clock */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 text-slate-300">
+          {/* Real-time Device Clock & Date */}
+          <button
+            id="system-device-clock-btn"
+            type="button"
+            onClick={() => setShowClockModal(!showClockModal)}
+            title="Device System Clock - Click for Telemetry & Sanity Check"
+            className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-all cursor-pointer group"
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-cyan-400 font-semibold">{currentTime || '00:00:00'}</span>
-          </div>
+            <div className="flex items-center gap-1.5 font-mono">
+              <span className="text-slate-400 font-normal hidden sm:inline">{deviceTime.formattedShortDate}</span>
+              <span className="text-cyan-400 font-semibold">
+                {use24Hour ? deviceTime.timeString24 : deviceTime.timeString}
+              </span>
+            </div>
+            <span className="text-[10px] px-1 py-0.2 rounded bg-slate-950 border border-slate-800 text-slate-400 hidden lg:inline">
+              {deviceTime.timeZoneOffsetFormatted}
+            </span>
+          </button>
+
+          {/* Clock & System Time Synchronization Sanity Check Modal */}
+          {showClockModal && (
+            <div
+              ref={clockModalRef}
+              className="absolute top-10 left-0 sm:left-auto sm:right-20 w-84 bg-slate-950 border border-cyan-500/30 rounded-xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 animate-in fade-in zoom-in-95 duration-150 font-mono"
+            >
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-cyan-400 font-semibold text-xs">
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <span>Device System Clock Telemetry</span>
+                </div>
+                <button
+                  onClick={() => setShowClockModal(false)}
+                  className="text-slate-500 hover:text-slate-300 p-0.5 rounded"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Sanity Check Overview */}
+              <div className="space-y-3 text-[11px]">
+                <div className="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <div>
+                    <div className="font-semibold">Live Device Clock Sync Active</div>
+                    <div className="text-[10px] text-emerald-400/80">Updating live every 1000ms from device hardware</div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800 space-y-1.5 text-slate-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Local Device Date:</span>
+                    <span className="text-slate-200 font-semibold">{deviceTime.formattedDate}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Local Device Time:</span>
+                    <span className="text-cyan-300 font-semibold">{deviceTime.timeString} ({deviceTime.timeString24})</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Local Timezone:</span>
+                    <span className="text-emerald-300 font-semibold">{deviceTime.timeZone}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Timezone Offset:</span>
+                    <span className="text-slate-300">{deviceTime.timeZoneOffsetFormatted} ({deviceTime.timeZoneOffsetMinutes} min)</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Epoch Timestamp:</span>
+                    <span className="text-slate-400 font-mono text-[10px]">{deviceTime.epochMs}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-slate-400">Clock Display Format:</span>
+                  <div className="flex rounded bg-slate-900 border border-slate-800 p-0.5 text-[10px]">
+                    <button
+                      onClick={() => setUse24Hour(false)}
+                      className={`px-2 py-0.5 rounded transition-all ${!use24Hour ? 'bg-cyan-500/30 text-cyan-200 font-bold' : 'text-slate-400'}`}
+                    >
+                      12-Hour
+                    </button>
+                    <button
+                      onClick={() => setUse24Hour(true)}
+                      className={`px-2 py-0.5 rounded transition-all ${use24Hour ? 'bg-cyan-500/30 text-cyan-200 font-bold' : 'text-slate-400'}`}
+                    >
+                      24-Hour
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Interactive Weather & Location Trigger */}
           <button

@@ -25,6 +25,7 @@ import {
   getAccessToken,
   subscribeAuth
 } from '../utils/googleAuth';
+import { getDeviceLocalDateTimeInputValue, getDeviceLocalDateString } from '../utils/dateTimeUtils';
 import {
   GoogleCalendarEvent,
   GmailMessagePreview,
@@ -123,13 +124,13 @@ export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = () => {
 
   // Forms State
   const [showEventForm, setShowEventForm] = useState(false);
-  const [newEvent, setNewEvent] = useState({
+  const [newEvent, setNewEvent] = useState(() => ({
     summary: '',
     description: '',
     location: '',
-    startDateTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
-    endDateTime: new Date(Date.now() + 7200000).toISOString().slice(0, 16)
-  });
+    startDateTime: getDeviceLocalDateTimeInputValue(new Date(Date.now() + 3600000)),
+    endDateTime: getDeviceLocalDateTimeInputValue(new Date(Date.now() + 7200000))
+  }));
 
   const [showComposeEmail, setShowComposeEmail] = useState(false);
   const [newEmail, setNewEmail] = useState({
@@ -281,8 +282,8 @@ export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = () => {
             summary: '',
             description: '',
             location: '',
-            startDateTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
-            endDateTime: new Date(Date.now() + 7200000).toISOString().slice(0, 16)
+            startDateTime: getDeviceLocalDateTimeInputValue(new Date(Date.now() + 3600000)),
+            endDateTime: getDeviceLocalDateTimeInputValue(new Date(Date.now() + 7200000))
           });
           notify(`Calendar event "${created.summary}" scheduled!`, 'success');
         } catch (err: any) {
@@ -659,7 +660,7 @@ export const GoogleWorkspaceHub: React.FC<GoogleWorkspaceHubProps> = () => {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean),
       pinned: false,
-      createdAt: new Date().toISOString().slice(0, 10)
+      createdAt: getDeviceLocalDateString()
     };
     setQuickNotes((prev) => [created, ...prev]);
     setShowNoteForm(false);

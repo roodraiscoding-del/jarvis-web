@@ -122,8 +122,8 @@ async function startServer() {
         return;
       }
 
-      const { coords, city } = req.body || {};
-      const result = await processJarvisCommand(message, { coords, city });
+      const { coords, city, clientTime } = req.body || {};
+      const result = await processJarvisCommand(message, { coords, city, clientTime });
       const text = result.reply || (result as any).text || '';
       res.json({
         ...result,
@@ -131,7 +131,7 @@ async function startServer() {
         role: 'assistant',
         text,
         reply: text,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: clientTime?.localTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
     } catch (err: any) {
       console.error('Error processing Jarvis command:', err);

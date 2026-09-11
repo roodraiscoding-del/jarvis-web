@@ -339,7 +339,17 @@ export async function executeAiQueryWithFallback(
  */
 export async function processJarvisCommand(
   userCommand: string,
-  options?: { coords?: { latitude: number; longitude: number }; city?: string }
+  options?: {
+    coords?: { latitude: number; longitude: number };
+    city?: string;
+    clientTime?: {
+      localDate?: string;
+      localTime?: string;
+      timeZone?: string;
+      formattedDate?: string;
+      timeZoneOffsetMinutes?: number;
+    };
+  }
 ): Promise<ProcessCommandResult> {
   const lower = userCommand.toLowerCase().trim();
   storage.recordRequest();
@@ -347,6 +357,41 @@ export async function processJarvisCommand(
   let actionTaken: ProcessCommandResult['actionTaken'] = undefined;
   let sources: ProcessCommandResult['sources'] = undefined;
   let contextForAi = '';
+
+  // Inject device clock context into AI context
+  if (options?.clientTime) {
+    contextForAi += `[USER DEVICE CLOCK: Current Local Date: ${options.clientTime.formattedDate || options.clientTime.localDate}, Local Time: ${options.clientTime.localTime}, TimeZone: ${options.clientTime.timeZone}]\n`;
+  }
+
+  // 00A. LIVE DEVICE TIME & DATE INQUIRIES
+  const isTimeOrDateInquiry =
+    (lower.includes('time') || lower.includes('date') || lower.includes('clock') || lower.includes('day is today')) &&
+    (lower.includes('what') || lower.includes('current') || lower.includes('tell me') || lower.includes('check') || lower.includes('sync') || lower === 'time' || lower === 'date' || lower === "what's the time" || lower === "what's the date");
+
+  if (isTimeOrDateInquiry && !lower.includes('meeting') && !lower.includes('schedule') && !lower.includes('reminder') && !lower.includes('tomorrow')) {
+    const clientTime = options?.clientTime;
+    const now = new Date();
+    const timeStr = clientTime?.localTime || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const dateStr = clientTime?.formattedDate || now.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+    const timeZone = clientTime?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+    const replyText = `At your command, Sir. Telemetry indicates your current local device time is **${timeStr}**, on **${dateStr}**.\n\n` +
+      `🌐 **System Clock Status:** Live synchronization locked to your device's local timezone (**${timeZone}**).\n` +
+      `All scheduled meetings, daily goals, and reminder intervals are calibrated to this exact clock.`;
+
+    return {
+      reply: replyText,
+      providerUsed: 'Device Clock Synchronizer',
+      modelUsed: 'local-device-telemetry',
+      fallbackTriggered: false,
+      fallbackChain: ['Local Device Clock (Synchronized)'],
+      actionTaken: {
+        type: 'device_clock_synced',
+        description: `Device clock telemetry retrieved: ${timeStr}, ${dateStr} (${timeZone})`,
+        details: { timeStr, dateStr, timeZone }
+      }
+    };
+  }
 
   // 00. HERMES AI (NOUS HERMES) WEB SCRAPING & DEEP RESEARCH SPECIALIST
   const isHermesIntent = lower.includes('hermis') || lower.includes('hermes');
@@ -603,12 +648,30 @@ export async function processJarvisCommand(
 
     const title = extracted.length >= 2 ? extracted : 'Sync Meeting';
 
-    // Default to tomorrow 14:00 if not specified
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    let dateStr = tomorrow.toISOString().split('T')[0];
-    if (lower.includes('today')) {
-      dateStr = new Date().toISOString().split('T')[0];
+    // Compute target meeting date respecting user device local clock
+    let dateStr = '';
+    if (options?.clientTime?.localDate) {
+      if (lower.includes('today')) {
+        dateStr = options.clientTime.localDate;
+      } else {
+        const [y, m, d] = options.clientTime.localDate.split('-').map(Number);
+        const tom = new Date(y, m - 1, d + 1);
+        const nextM = String(tom.getMonth() + 1).padStart(2, '0');
+        const nextD = String(tom.getDate()).padStart(2, '0');
+        dateStr = `${tom.getFullYear()}-${nextM}-${nextD}`;
+      }
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const d = String(tomorrow.getDate()).padStart(2, '0');
+      dateStr = `${tomorrow.getFullYear()}-${m}-${d}`;
+      if (lower.includes('today')) {
+        const now = new Date();
+        const curM = String(now.getMonth() + 1).padStart(2, '0');
+        const curD = String(now.getDate()).padStart(2, '0');
+        dateStr = `${now.getFullYear()}-${curM}-${curD}`;
+      }
     }
 
     const timeMatch = userCommand.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);

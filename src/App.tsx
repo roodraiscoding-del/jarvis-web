@@ -23,6 +23,7 @@ import {
 import { Calendar, Share2, Shield, Music, FileText, Compass, Info, CheckCircle2, Sparkles, Mic, Radio } from 'lucide-react';
 import { playVoiceButtonSound } from './utils/audioSynth';
 import { speechManager } from './utils/speechService';
+import { getDeviceLocalDateString } from './utils/dateTimeUtils';
 
 export default function App() {
   // Navigation & Modal State
@@ -176,12 +177,24 @@ export default function App() {
       }
 
       try {
+        const clientLocalDate = getDeviceLocalDateString();
+        const clientLocalTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        const clientFormattedDate = new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: commandText,
-            coords: coordsToSend || undefined
+            coords: coordsToSend || undefined,
+            clientTime: {
+              localDate: clientLocalDate,
+              localTime: clientLocalTime,
+              timeZone: clientTimeZone,
+              timeZoneOffsetMinutes: new Date().getTimezoneOffset(),
+              formattedDate: clientFormattedDate
+            }
           }),
         });
 
@@ -196,7 +209,7 @@ export default function App() {
           id: rawData.id || `msg-${Date.now()}`,
           role: 'assistant',
           text: replyText,
-          timestamp: rawData.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, replyData]);
 

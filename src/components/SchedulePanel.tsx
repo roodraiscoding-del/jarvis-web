@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Plus, Trash2, CheckCircle2, Circle, AlertCircle, Target, Users, Bell } from 'lucide-react';
 import { Meeting, Reminder, DailyGoal } from '../types';
+import { getDeviceLocalDateString, getDeviceLocalTimeString, getDeviceTimeInfo } from '../utils/dateTimeUtils';
 
 interface SchedulePanelProps {
   meetings: Meeting[];
@@ -28,13 +29,26 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
   const [activeTab, setActiveTab] = useState<'meetings' | 'reminders' | 'goals'>('meetings');
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newTime, setNewTime] = useState('14:00');
+  const [newDate, setNewDate] = useState(() => getDeviceLocalDateString());
+  const [newTime, setNewTime] = useState(() => {
+    const nextHour = new Date(Date.now() + 3600000);
+    nextHour.setMinutes(0, 0, 0);
+    return getDeviceLocalTimeString(nextHour);
+  });
   const [newDuration, setNewDuration] = useState('30');
   const [newParticipants, setNewParticipants] = useState('');
 
   const [reminderInput, setReminderInput] = useState('');
   const [reminderPriority, setReminderPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+  const openAddMeetingModal = () => {
+    const now = new Date();
+    setNewDate(getDeviceLocalDateString(now));
+    const nextHour = new Date(now.getTime() + 3600000);
+    nextHour.setMinutes(0, 0, 0);
+    setNewTime(getDeviceLocalTimeString(nextHour));
+    setShowAddMeetingModal(true);
+  };
 
   const handleCreateMeeting = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +121,7 @@ export const SchedulePanel: React.FC<SchedulePanelProps> = ({
 
         {activeTab === 'meetings' && (
           <button
-            onClick={() => setShowAddMeetingModal(true)}
+            onClick={openAddMeetingModal}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-mono rounded bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-600/40 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
