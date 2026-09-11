@@ -1,0 +1,29 @@
+{
+  "user_profile": {
+    "email": "rudramitra2608@gmail.com",
+    "preferences": {
+      "communication_style": "direct, natural, concise, zero process talk or internal tool mentions unless 'research mode' is invoked or specifically asked how/why",
+      "tone": "helpful, confident, unobtrusive, tailored"
+    },
+    "habits_and_routines": {},
+    "ongoing_projects": [
+      "Jarvis AI Web & Desktop Automation Agent",
+      "Local Automation Bridge (Python Playwright, PyAutoGUI, Voice, Desktop controls)",
+      "Google Workspace Integration (Calendar, Gmail, Drive, Docs, Tasks, Contacts)"
+    ],
+    "interaction_history": [
+      {
+        "timestamp": "2026-09-11T03:15:00Z",
+        "summary": "Resolved Google Workspace authentication persistence issue so sessions persist across page refreshes via browser-scoped localStorage without logging out other users."
+      },
+      {
+        "timestamp": "2026-09-11T05:18:00Z",
+        "summary": "Established permanent response directive to give direct answers with zero process talk unless 'research mode' is triggered or asked how/why."
+      },
+      {
+        "timestamp": "2026-09-11T05:22:00Z",
+        "summary": "Activated persistent memory loop to silently store preferences, habits, routines, and details to continuously personalize future interactions."
+      }
+    ]
+  }
+}
