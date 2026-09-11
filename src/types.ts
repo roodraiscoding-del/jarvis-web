@@ -67,13 +67,44 @@ export interface SocialDraft {
 export interface ModelProviderInfo {
   id: string;
   name: string;
-  provider: 'gemini' | 'groq' | 'openrouter' | 'fallback_engine';
+  provider: 'gemini' | 'groq' | 'openrouter' | 'hermes' | 'fallback_engine';
   modelName: string;
   tier: 'Free Tier';
   status: 'operational' | 'rate_limited' | 'quota_exhausted' | 'standby';
   latencyMs?: number;
   isCurrentPrimary: boolean;
   quotaDescription: string;
+}
+
+export interface HermesScrapeResult {
+  url: string;
+  title: string;
+  metaDescription?: string;
+  wordCount: number;
+  headings: string[];
+  extractedLinks: Array<{ text: string; url: string }>;
+  structuredSummary: string;
+  keyEntities: string[];
+  keyDataPoints: string[];
+  mainContentSnippet: string;
+  scrapedAt: string;
+  provider: string;
+  model: string;
+  status: 'success' | 'partial' | 'error';
+  errorMessage?: string;
+}
+
+export interface HermesResearchResult {
+  query: string;
+  executiveBrief: string;
+  keyFindings: string[];
+  dataPoints: string[];
+  actionableInsights: string[];
+  scrapedSources: Array<{ title: string; url: string; snippet: string }>;
+  provider: string;
+  model: string;
+  completedAt: string;
+  status: 'success' | 'partial' | 'error';
 }
 
 export interface MediaTrack {

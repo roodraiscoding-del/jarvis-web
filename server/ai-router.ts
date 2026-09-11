@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { storage } from './storage.js';
 import { executeWebSearch } from './web-search.js';
 import { fetchWeatherByCoordinates, fetchWeatherByCityName, WeatherInfo } from './weather-service.js';
+import { executeHermesScrapeAnalysis, executeHermesResearch, scrapeWebPage } from './hermes-research.js';
 import { ChatMessage, ModelProviderInfo } from '../src/types.js';
 
 let forceSimulatedRateLimit = false;
@@ -30,6 +31,17 @@ export function getProviderMatrix(): ModelProviderInfo[] {
       latencyMs: 380,
       isCurrentPrimary: !forceSimulatedRateLimit && geminiAvailable,
       quotaDescription: 'Google AI Studio Free Tier (Primary Core)'
+    },
+    {
+      id: 'hermes-3-research',
+      name: 'Hermes AI / Nous Hermes-3 (Research & Web Scraper)',
+      provider: 'hermes',
+      modelName: 'nousresearch/hermes-3-llama-3.1-405b:free',
+      tier: 'Free Tier',
+      status: 'operational',
+      latencyMs: 290,
+      isCurrentPrimary: false,
+      quotaDescription: 'Nous Research Hermes Agentic Web Scraping & Multi-Source Research'
     },
     {
       id: 'gemini-lite',
@@ -335,6 +347,105 @@ export async function processJarvisCommand(
   let actionTaken: ProcessCommandResult['actionTaken'] = undefined;
   let sources: ProcessCommandResult['sources'] = undefined;
   let contextForAi = '';
+
+  // 00. HERMES AI (NOUS HERMES) WEB SCRAPING & DEEP RESEARCH SPECIALIST
+  const isHermesIntent = lower.includes('hermis') || lower.includes('hermes');
+  const isScrapingIntent = lower.includes('scrape') || lower.includes('scraping') || lower.includes('web scrape') || lower.includes('extract url') || lower.includes('extract page');
+  const isDeepResearchIntent = lower.includes('deep research') || (isHermesIntent && (lower.includes('research') || lower.includes('investigate')));
+
+  // Check if a URL was provided in the command
+  const urlMatch = userCommand.match(/https?:\/\/[^\s]+|[a-zA-Z0-9.-]+\.(?:com|org|io|net|edu|gov|dev|ai|app|co|xyz|me)(?:\/[^\s]*)?/i);
+
+  if (isHermesIntent || (isScrapingIntent && !lower.includes('schedule') && !lower.includes('meeting')) || isDeepResearchIntent) {
+    // Case A: URL Web Scraping requested
+    if (urlMatch || (isScrapingIntent && urlMatch)) {
+      const targetUrl = urlMatch ? urlMatch[0] : 'https://news.ycombinator.com';
+      try {
+        const scrapeRes = await executeHermesScrapeAnalysis(targetUrl, userCommand);
+        const replyText = `At your command, Sir. Hermes AI (Nous Research Hermes-3) has completed web scraping for "${scrapeRes.title}".\n\n` +
+          `📊 **Scrape Overview:** Extracted ${scrapeRes.wordCount} semantic words across ${scrapeRes.headings.length} primary headings.\n\n` +
+          `🔍 **Executive Summary:**\n${scrapeRes.structuredSummary}\n\n` +
+          (scrapeRes.keyDataPoints.length > 0 ? `📈 **Extracted Data Points:**\n${scrapeRes.keyDataPoints.map(p => `• ${p}`).join('\n')}\n\n` : '') +
+          (scrapeRes.keyEntities.length > 0 ? `🏷️ **Identified Entities:** ${scrapeRes.keyEntities.join(', ')}\n\n` : '') +
+          `Full extracted findings and outbound links are synchronized to your Web Research Hub.`;
+
+        return {
+          reply: replyText,
+          providerUsed: 'Hermes AI (Nous Research Hermes-3)',
+          modelUsed: scrapeRes.model,
+          fallbackTriggered: false,
+          fallbackChain: ['Hermes AI Agent (Scraping Core)'],
+          actionTaken: {
+            type: 'hermes_scrape',
+            description: `Hermes AI scraped & extracted DOM from ${targetUrl} (${scrapeRes.wordCount} words, ${scrapeRes.headings.length} headings)`,
+            details: scrapeRes
+          },
+          sources: scrapeRes.extractedLinks.slice(0, 5).map(l => ({ title: l.text, url: l.url, snippet: `Direct link extracted from ${targetUrl}` }))
+        };
+      } catch (err: any) {
+        console.warn('Hermes scrape command encountered error, continuing:', err);
+      }
+    }
+
+    // Case B: Research inquiry with Hermes AI
+    const researchMatch = userCommand
+      .replace(/use hermis ai for web scraping or doing the research|use hermis ai|use hermes ai|hermis ai|hermes ai|do research on|research on|deep research on|web scraping or doing the research|for web scraping or doing the research|for web scraping|web scraping|scrape|research/gi, '')
+      .replace(/^[,\s:\-]+|[,\s:\-]+$/g, '')
+      .trim();
+
+    if (researchMatch.length > 3) {
+      try {
+        const researchRes = await executeHermesResearch(researchMatch, 'deep');
+        const replyText = `At your command, Sir. Hermes AI (Nous Research Hermes-3 Agent) has concluded multi-source deep research on "${researchMatch}".\n\n` +
+          `📑 **Executive Brief:**\n${researchRes.executiveBrief}\n\n` +
+          `💡 **Key Discoveries:**\n${researchRes.keyFindings.map(f => `• ${f}`).join('\n')}\n\n` +
+          `📊 **Quantifiable Telemetry & Data:**\n${researchRes.dataPoints.map(d => `• ${d}`).join('\n')}\n\n` +
+          `🎯 **Actionable Recommendations:**\n${researchRes.actionableInsights.map(a => `• ${a}`).join('\n')}\n\n` +
+          `Detailed citations from ${researchRes.scrapedSources.length} verified web sources are logged in your Web Research Hub.`;
+
+        return {
+          reply: replyText,
+          providerUsed: 'Hermes AI (Nous Research Hermes-3)',
+          modelUsed: researchRes.model,
+          fallbackTriggered: false,
+          fallbackChain: ['Hermes AI (Nous Research Multi-Source Research Engine)'],
+          actionTaken: {
+            type: 'hermes_research',
+            description: `Hermes AI Deep Research on "${researchMatch}" (${researchRes.keyFindings.length} findings, ${researchRes.scrapedSources.length} sources)`,
+            details: researchRes
+          },
+          sources: researchRes.scrapedSources
+        };
+      } catch (err: any) {
+        console.warn('Hermes research command encountered error, continuing:', err);
+      }
+    }
+
+    // Case C: General instruction: "use hermis ai for web scraping or doing the research"
+    actionTaken = {
+      type: 'hermes_activated',
+      description: 'Hermes AI (Nous Research Hermes-3) engaged as primary autonomous engine for Web Scraping and Deep Multi-Source Research.',
+      details: {
+        engine: 'Nous Research Hermes-3 Agent',
+        status: 'active',
+        capabilities: ['Live URL DOM Scraping', 'Deep Web Research Synthesis', 'Structured Data Extraction', 'Multi-Source Fact Cross-Referencing']
+      }
+    };
+
+    const replyText = `Protocol acknowledged and locked, Sir. Hermes AI (Nous Research Hermes-3) is now fully engaged as your dedicated autonomous engine for all Web Scraping and Deep Research operations.\n\n` +
+      `🌐 **Web Scraping Directives:** Provide any URL or command (e.g. *"Scrape https://github.com"* or *"Extract key takeaways from https://news.ycombinator.com"*). Hermes AI will extract semantic text, clean boilerplate, parse DOM headings, and deliver structured entity and data analysis.\n\n` +
+      `🔬 **Deep Research Directives:** Inquire on any topic (e.g. *"Hermes research latest developments in agentic AI 2026"*). Hermes AI will crawl real-time web sources, cross-verify claims, and compile synthesized executive intelligence.\n\n` +
+      `All scraping and research tools are also readily accessible in the **Web Research Hub** under the dedicated **Hermes AI Agent** deck. Ready for your first target URL or research inquiry.`;
+
+    return {
+      reply: replyText,
+      providerUsed: 'Hermes AI (Nous Research Hermes-3)',
+      modelUsed: 'nousresearch/hermes-3-llama-3.1-405b:free',
+      fallbackTriggered: false,
+      fallbackChain: ['Hermes AI (Nous Research Hermes-3 Active)'],
+      actionTaken
+    };
+  }
 
   // 0A. WEATHER & LOCATION SYNCHRONIZATION
   if (

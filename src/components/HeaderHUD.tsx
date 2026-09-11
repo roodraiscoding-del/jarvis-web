@@ -316,6 +316,8 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
                 ? 'bg-amber-950/50 border-amber-500/40 text-amber-300'
                 : activeProvider?.provider === 'gemini'
                 ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300'
+                : activeProvider?.provider === 'hermes'
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
                 : 'bg-indigo-950/60 border-indigo-500/40 text-indigo-300'
             }`}
           >

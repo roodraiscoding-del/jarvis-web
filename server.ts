@@ -11,6 +11,7 @@ import {
   executeAiQueryWithFallback
 } from './server/ai-router.js';
 import { executeWebSearch, fetchLiveNews } from './server/web-search.js';
+import { executeHermesScrapeAnalysis, executeHermesResearch, scrapeWebPage } from './server/hermes-research.js';
 import { getExtensionFiles } from './server/extension-bundle.js';
 import { fetchWeatherByCoordinates, fetchWeatherByCityName } from './server/weather-service.js';
 
@@ -385,6 +386,39 @@ async function startServer() {
   app.get('/api/news', async (req: Request, res: Response) => {
     const news = await fetchLiveNews();
     res.json(news);
+  });
+
+  // -------------------------------------------------------------
+  // 7B. Hermes AI (Nous Hermes-3) Web Scraping & Deep Research
+  // -------------------------------------------------------------
+  app.post('/api/hermes/scrape', async (req: Request, res: Response) => {
+    try {
+      const { url, instruction } = req.body || {};
+      if (!url || typeof url !== 'string') {
+        res.status(400).json({ error: 'Target URL is required for Hermes Web Scraper' });
+        return;
+      }
+      const result = await executeHermesScrapeAnalysis(url, instruction);
+      res.json(result);
+    } catch (err: any) {
+      console.error('Hermes scrape endpoint error:', err);
+      res.status(500).json({ error: 'Failed to scrape webpage', message: err.message });
+    }
+  });
+
+  app.post('/api/hermes/research', async (req: Request, res: Response) => {
+    try {
+      const { query, depth } = req.body || {};
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({ error: 'Research query is required for Hermes Deep Research' });
+        return;
+      }
+      const result = await executeHermesResearch(query, depth === 'fast' ? 'fast' : 'deep');
+      res.json(result);
+    } catch (err: any) {
+      console.error('Hermes research endpoint error:', err);
+      res.status(500).json({ error: 'Failed to complete Hermes research', message: err.message });
+    }
   });
 
   // -------------------------------------------------------------

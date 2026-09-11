@@ -279,20 +279,20 @@
     }
   ],
   "stats": {
-    "totalRequests": 35,
+    "totalRequests": 37,
     "fallbackEvents": 25,
     "startTime": "2026-09-10T19:23:19.405Z"
   },
   "weather": {
-    "city": "New York, New York",
-    "tempC": 31,
-    "tempF": 88,
-    "condition": "Clear Sky",
-    "humidity": 43,
-    "windSpeed": "10 mph",
+    "city": "Kolkata, West Bengal",
+    "tempC": 30,
+    "tempF": 86,
+    "condition": "Overcast",
+    "humidity": 78,
+    "windSpeed": "8 mph",
     "isLiveLocation": true,
-    "latitude": 40.7128,
-    "longitude": -74.006,
-    "updatedAt": "2026-09-10T21:20:21.415Z"
+    "latitude": 22.51026969663262,
+    "longitude": 88.40571377235878,
+    "updatedAt": "2026-09-11T08:13:27.807Z"
   }
 }
